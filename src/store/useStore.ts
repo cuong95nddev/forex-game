@@ -3,6 +3,7 @@ import { supabase, type User, type GoldPrice } from '../lib/supabase'
 import { getFingerprint } from '../lib/fingerprint'
 import { initializeDatabase } from '../lib/initDb'
 import { toast } from 'sonner'
+import confetti from 'canvas-confetti'
 
 interface Round {
   id: string
@@ -38,6 +39,8 @@ interface AppState {
   onlineUsers: number
   loading: boolean
   allUsers: User[]
+  lastWinAmount: number | null
+  setLastWinAmount: (amount: number | null) => void
   initializeUser: (name: string) => Promise<void>
   loadUser: () => Promise<void>
   placeBet: (prediction: 'up' | 'down', amount: number) => Promise<boolean>
@@ -73,7 +76,10 @@ export const useStore = create<AppState>((set, get) => ({
   winRate: 0.95,
   onlineUsers: 0,
   allUsers: [],
+  lastWinAmount: null,
   loading: false, // Changed default to false
+
+  setLastWinAmount: (amount) => set({ lastWinAmount: amount }),
 
   loadUser: async () => {
     try {
@@ -556,7 +562,17 @@ export const useStore = create<AppState>((set, get) => ({
 
               // Show result
               if (updatedBet.result === 'won') {
-                toast.success(`🎉 Chúc mừng! Bạn đã thắng $${updatedBet.profit.toFixed(2)}!`)
+                // Set the win amount to trigger the animation in the UI
+                set({ lastWinAmount: updatedBet.profit })
+                
+                // Trigger confetti
+                confetti({
+                  particleCount: 150,
+                  spread: 80,
+                  origin: { y: 0.6 },
+                  colors: ['#10b981', '#f59e0b', '#ffffff'],
+                  zIndex: 100 // Ensure it's above everything
+                });
               } else if (updatedBet.result === 'lost') {
                 toast.error(`😔 Bạn đã thua $${updatedBet.bet_amount.toFixed(2)}`)
               }

@@ -29,7 +29,9 @@ export default function TradingInterface() {
     onlineUsers,
     loadOnlineUsers,
     allUsers,
-    loadAllUsers
+    loadAllUsers,
+    lastWinAmount,
+    setLastWinAmount
   } = useStore()
   
   const [betAmount, setBetAmount] = useState('100')
@@ -122,6 +124,16 @@ export default function TradingInterface() {
     }
   }, [goldPrice])
 
+  useEffect(() => {
+    if (lastWinAmount !== null) {
+       // Clear the win amount after 4 seconds to hide the animation
+       const timer = setTimeout(() => {
+          setLastWinAmount(null)
+       }, 4000)
+       return () => clearTimeout(timer)
+    }
+  }, [lastWinAmount, setLastWinAmount])
+
   const handleBet = async (prediction: 'up' | 'down') => {
     const amount = parseFloat(betAmount)
     if (isNaN(amount) || amount <= 0) {
@@ -157,7 +169,21 @@ export default function TradingInterface() {
   const quickAmounts = [100, 500, 1000, 5000, 10000, 50000]
 
   return (
-    <div className="min-h-screen bg-[#0b0f13] text-foreground flex flex-col font-sans">
+    <div className="min-h-screen bg-[#0b0f13] text-foreground flex flex-col font-sans relative overflow-hidden">
+      
+      {/* WIN ANIMATION OVERLAY */}
+      {lastWinAmount !== null && (
+         <div className="absolute inset-0 z-[100] flex items-center justify-center pointer-events-none">
+            <div className="flex flex-col items-center animate-in fade-in zoom-in slide-in-from-bottom-10 duration-500">
+               <div className="text-6xl font-black text-[#10b981] drop-shadow-[0_0_15px_rgba(16,185,129,0.5)] mb-2">
+                  +${lastWinAmount.toLocaleString()}
+               </div>
+               <div className="text-2xl font-bold text-white uppercase tracking-widest bg-[#10b981]/20 px-6 py-2 rounded-full border border-[#10b981]/50 backdrop-blur-md">
+                  YOU WON!
+               </div>
+            </div>
+         </div>
+      )}
       
       {/* PROFESSIONAL HEADER */}
       <header className="h-14 border-b border-[#1e293b] bg-[#0f172a] flex items-center px-4 justify-between sticky top-0 z-50">
