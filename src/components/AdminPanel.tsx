@@ -48,6 +48,7 @@ export default function AdminPanel() {
   const adminSessionId = useRef<string>(`admin-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`)
   const currentPriceRef = useRef(2000)
   const priceChangeRef = useRef(0)
+  const lastTrendRef = useRef(0) // For smoother price movement
   const isInitialized = useRef(false)
   const pausedCountdown = useRef<number | null>(null)
   const pausedRound = useRef<any>(null)
@@ -736,9 +737,32 @@ export default function AdminPanel() {
       setCurrentPrice(2000)
     }
     
-    // Generate random price change (-2% to +2%)
-    const changePercent = (Math.random() - 0.5) * 4
-    const change = latestPrice * (changePercent / 100)
+    // Improved realistic market movement
+    // 1. Update trend (smooth random walk): allow trend to shift slowly
+    // Small random adjustment to current trend
+    const trendAdjustment = (Math.random() - 0.5) * 0.1
+    // Apply decay to pull trend back to 0 over time (mean reversion for trend)
+    lastTrendRef.current = (lastTrendRef.current * 0.95) + trendAdjustment
+    
+    // Clamp trend to avoid runaway prices
+    if (lastTrendRef.current > 1.5) lastTrendRef.current = 1.5
+    if (lastTrendRef.current < -1.5) lastTrendRef.current = -1.5
+
+    // 2. Volatility (Market Noise) - Random distinct move
+    // Using box-muller for normal distribution feel
+    const u1 = Math.random()
+    const u2 = Math.random()
+    const z = Math.sqrt(-2.0 * Math.log(u1 || 0.00001)) * Math.cos(2.0 * Math.PI * u2)
+    const volatility = 2.0 // Standard deviation in dollars
+    const noise = z * volatility
+
+    // 3. Calculate new change
+    let change = lastTrendRef.current + noise
+    
+    // 4. Global Mean Reversion (pull back to 2000 if strayed too far)
+    if (latestPrice > 2500) change -= 0.5
+    if (latestPrice < 1500) change += 0.5
+    
     const newPrice = latestPrice + change
 
     await updatePrice(newPrice, change)
