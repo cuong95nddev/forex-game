@@ -12,7 +12,9 @@ export default function TradingInterface() {
     countdown, 
     placeBet, 
     recentBets, 
-    loadRecentBets 
+    loadRecentBets,
+    priceHistory,
+    loadPriceHistory
   } = useStore()
   
   const [betAmount, setBetAmount] = useState('100')
@@ -23,27 +25,19 @@ export default function TradingInterface() {
 
   useEffect(() => {
     loadRecentBets()
-  }, [loadRecentBets])
+    loadPriceHistory()
+  }, [loadRecentBets, loadPriceHistory])
 
   useEffect(() => {
-    // Generate chart data
-    if (goldPrice) {
-      const now = Math.floor(Date.now() / 1000)
-      const basePrice = goldPrice.price
-      const variation = basePrice * 0.01
-      
-      // Generate last 50 data points
-      const newChartPrices = []
-      for (let i = 50; i >= 0; i--) {
-        const time = now - (i * 15)
-        const value = basePrice + (Math.random() - 0.5) * variation
-        
-        newChartPrices.push({ time, value })
-      }
-      
-      setChartPrices(newChartPrices)
+    // Convert price history to chart format
+    if (priceHistory && priceHistory.length > 0) {
+      const chartData = priceHistory.map(price => ({
+        time: new Date(price.timestamp).getTime() / 1000,
+        value: price.price
+      }))
+      setChartPrices(chartData)
     }
-  }, [goldPrice])
+  }, [priceHistory])
 
   // Show loading state if no user or goldPrice
   if (!user || !goldPrice) {
@@ -92,6 +86,11 @@ export default function TradingInterface() {
   const priceChangePercent = goldPrice ? ((priceChange / goldPrice.price) * 100).toFixed(2) : '0.00'
   const isPositive = priceChange >= 0
 
+  // Debug logging
+  useEffect(() => {
+    console.log('💰 TradingInterface goldPrice updated:', goldPrice)
+  }, [goldPrice])
+
   const quickAmounts = [100, 500, 1000, 5000]
   return (    <div className="min-h-screen bg-[#0a0e27] text-white">
       {/* Top Bar */}
@@ -135,7 +134,7 @@ export default function TradingInterface() {
                   <div className="text-sm text-gray-400 mb-1">XAU/USD - Gold Spot</div>
                   <div className="flex items-center gap-4">
                     <div className="text-3xl font-bold">
-                      ${goldPrice?.price.toLocaleString() || '0.00'}
+                      ${goldPrice?.price.toFixed(2) || '0.00'}
                     </div>
                     <div className={`flex items-center gap-1 px-3 py-1 rounded ${
                       isPositive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
@@ -224,9 +223,6 @@ export default function TradingInterface() {
                   <div className="text-center">
                     <div className="text-sm text-gray-400 mb-2">Vòng hiện tại</div>
                     <div className="text-3xl font-bold text-blue-400">#{currentRound.round_number}</div>
-                    <div className="text-sm text-gray-400 mt-2">
-                      Giá mở cửa: ${currentRound.start_price.toFixed(2)}
-                    </div>
                   </div>
                 </div>
               )}

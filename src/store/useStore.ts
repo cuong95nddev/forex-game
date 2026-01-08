@@ -30,6 +30,7 @@ interface AppState {
   currentRound: Round | null
   userBet: Bet | null
   recentBets: Bet[]
+  priceHistory: GoldPrice[]
   countdown: number
   loading: boolean
   initializeUser: (name: string) => Promise<void>
@@ -39,6 +40,7 @@ interface AppState {
   subscribeToBroadcast: () => void
   subscribeToRounds: () => void
   loadRecentBets: () => Promise<void>
+  loadPriceHistory: () => Promise<void>
 }
 
 let countdownInterval: NodeJS.Timeout | null = null
@@ -50,6 +52,7 @@ export const useStore = create<AppState>((set, get) => ({
   currentRound: null,
   userBet: null,
   recentBets: [],
+  priceHistory: [],
   countdown: 15,
   loading: true,
 
@@ -215,7 +218,7 @@ export const useStore = create<AppState>((set, get) => ({
 
   subscribeToGoldPrice: () => {
     console.log('Setting up gold price subscription...')
-    supabase
+    const channel = supabase
       .channel('gold-prices-realtime')
       .on(
         'postgres_changes',
@@ -225,13 +228,28 @@ export const useStore = create<AppState>((set, get) => ({
           table: 'gold_prices'
         },
         (payload) => {
-          console.log('🔥 Gold price updated:', payload.new)
-          set({ goldPrice: payload.new as GoldPrice })
+          console.log('🔥 Gold price updated via realtime:', payload.new)
+          const newPrice = payload.new as GoldPrice
+          set({ goldPrice: newPrice })
+          
+          // Update price history
+          const { priceHistory } = get()
+          const updatedHistory = [...priceHistory, newPrice]
+          // Keep last 100 prices
+          if (updatedHistory.length > 100) {
+            updatedHistory.shift()
+          }
+          set({ priceHistory: updatedHistory })
         }
       )
-      .subscribe((status) => {
-        console.log('Gold price subscription status:', status)
+      .subscribe((status, err) => {
+        if (err) {
+          console.error('❌ Gold price subscription error:', err)
+        }
+        console.log('✅ Gold price subscription status:', status)
       })
+    
+    return channel
   },
 
   subscribeToBroadcast: () => {
@@ -244,11 +262,57 @@ export const useStore = create<AppState>((set, get) => ({
         console.log('📡 Broadcast received:', payload)
         const { countdown, currentRound, goldPrice } = payload.payload
         
-        set({ 
-          countdown,
-          currentRound,
-          goldPrice: goldPrice ? { price: goldPrice, change: 0, timestamp: new Date().toISOString() } : get().goldPrice
-        })
+        if (goldPrice !== undefined) {
+          console.log('🔥 Gold Price from broadcast:', goldPrice, 'Type:', typeof goldPrice)
+          // If goldPrice is a complete object with price and change, use it
+          // Otherwise treat it as just a price number (backwards compatibility)
+          if (typeof goldPrice === 'object' && goldPrice.price !== undefined) {
+            console.log('✅ Setting goldPrice object:', goldPrice)
+            set({ 
+              countdown,
+              currentRound,
+              goldPrice: goldPrice
+            })
+            
+            // Update price history
+            const { priceHistory } = get()
+            const updatedHistory = [...priceHistory, goldPrice]
+            // Keep last 100 prices
+            if (updatedHistory.length > 100) {
+              updatedHistory.shift()
+            }
+            set({ priceHistory: updatedHistory })
+          } else {
+            // Fallback: calculate change from previous price
+            const oldPrice = get().goldPrice
+            const change = oldPrice ? goldPrice - oldPrice.price : 0
+            console.log('⚠️ Converting number to goldPrice object. Old:', oldPrice?.price, 'New:', goldPrice, 'Change:', change)
+            
+            const newPriceObj = {
+              price: goldPrice,
+              change: change,
+              timestamp: new Date().toISOString(),
+              id: '' // ID not needed for display
+            }
+            
+            set({ 
+              countdown,
+              currentRound,
+              goldPrice: newPriceObj
+            })
+            
+            // Update price history
+            const { priceHistory } = get()
+            const updatedHistory = [...priceHistory, newPriceObj]
+            // Keep last 100 prices
+            if (updatedHistory.length > 100) {
+              updatedHistory.shift()
+            }
+            set({ priceHistory: updatedHistory })
+          }
+        } else {
+          set({ countdown, currentRound })
+        }
       })
       .subscribe((status) => {
         console.log('Broadcast subscription status:', status)
@@ -268,6 +332,23 @@ export const useStore = create<AppState>((set, get) => ({
       }
     } catch (error) {
       console.error('Error loading recent bets:', error)
+    }
+  },
+
+  loadPriceHistory: async () => {
+    try {
+      const { data } = await supabase
+        .from('gold_prices')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(100)
+
+      if (data) {
+        // Reverse to get oldest first (for chart)
+        set({ priceHistory: data.reverse() })
+      }
+    } catch (error) {
+      console.error('Error loading price history:', error)
     }
   },
 

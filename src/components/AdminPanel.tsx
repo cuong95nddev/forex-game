@@ -5,8 +5,7 @@ import { Play, Pause, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react'
 export default function AdminPanel() {
   const [currentPrice, setCurrentPrice] = useState(2000)
   const [priceChange, setPriceChange] = useState(0)
-  const [isAutoMode, setIsAutoMode] = useState(false)
-  const [autoInterval, setAutoInterval] = useState(15)
+  const [isAutoMode, setIsAutoMode] = useState(true)
   const [currentRound, setCurrentRound] = useState<any>(null)
   const [countdown, setCountdown] = useState(15)
   const [stats, setStats] = useState({
@@ -16,6 +15,8 @@ export default function AdminPanel() {
   })
   const broadcastChannel = useRef<any>(null)
   const countdownInterval = useRef<any>(null)
+  const currentPriceRef = useRef(2000)
+  const priceChangeRef = useRef(0)
 
   useEffect(() => {
     const initialize = async () => {
@@ -62,13 +63,13 @@ export default function AdminPanel() {
     if (isAutoMode) {
       interval = setInterval(() => {
         handleAutoUpdatePrice()
-      }, autoInterval * 1000)
+      }, 1000) // Update mỗi 1 giây
     }
 
     return () => {
       if (interval) clearInterval(interval)
     }
-  }, [isAutoMode, autoInterval, currentPrice])
+  }, [isAutoMode, currentPrice])
 
   const loadCurrentPrice = async () => {
     const { data } = await supabase
@@ -81,6 +82,8 @@ export default function AdminPanel() {
     if (data) {
       setCurrentPrice(data.price)
       setPriceChange(data.change)
+      currentPriceRef.current = data.price
+      priceChangeRef.current = data.change
     } else {
       // Insert initial price if none exists
       console.log('No price data, creating initial price...')
@@ -93,6 +96,8 @@ export default function AdminPanel() {
       if (newPrice) {
         setCurrentPrice(newPrice.price)
         setPriceChange(0)
+        currentPriceRef.current = newPrice.price
+        priceChangeRef.current = 0
       }
     }
   }
@@ -110,13 +115,15 @@ export default function AdminPanel() {
       
       // Broadcast game state to all clients
       if (broadcastChannel.current) {
+        const latestPrice = currentPriceRef.current
+        const change = latestPrice - round.start_price
         broadcastChannel.current.send({
           type: 'broadcast',
           event: 'game-state',
           payload: {
             countdown: remaining,
             currentRound: round,
-            goldPrice: currentPrice
+            goldPrice: { price: latestPrice, change: change, timestamp: new Date().toISOString() }
           }
         })
       }
@@ -274,21 +281,28 @@ export default function AdminPanel() {
     await updatePrice(currentPrice, priceChange)
   }
 
-  const updatePrice = async (price: number, change: number) => {
+  const updatePrice = async (price: number, priceIncrement: number) => {
     try {
+      // Calculate change relative to round start price
+      const change = currentRound ? price - currentRound.start_price : priceIncrement
+      
       // Insert new price
-      await supabase
+      const { data: newPriceData } = await supabase
         .from('gold_prices')
         .insert({
           price: price,
           change: change,
           timestamp: new Date().toISOString(),
         })
+        .select()
+        .single()
 
       setCurrentPrice(price)
       setPriceChange(change)
+      currentPriceRef.current = price
+      priceChangeRef.current = change
 
-      // Broadcast price update
+      // Broadcast price update with full price data
       if (broadcastChannel.current && currentRound) {
         broadcastChannel.current.send({
           type: 'broadcast',
@@ -296,7 +310,7 @@ export default function AdminPanel() {
           payload: {
             countdown,
             currentRound,
-            goldPrice: price
+            goldPrice: newPriceData || { price, change, timestamp: new Date().toISOString() }
           }
         })
       }
@@ -310,16 +324,16 @@ export default function AdminPanel() {
     }
   }
 
-  const handlePriceIncrease = () => {
+  const handlePriceIncrease = async () => {
     const increase = currentPrice * 0.01 // 1%
-    setCurrentPrice(prev => prev + increase)
-    setPriceChange(increase)
+    const newPrice = currentPrice + increase
+    await updatePrice(newPrice, increase)
   }
 
-  const handlePriceDecrease = () => {
+  const handlePriceDecrease = async () => {
     const decrease = currentPrice * 0.01 // 1%
-    setCurrentPrice(prev => prev - decrease)
-    setPriceChange(-decrease)
+    const newPrice = currentPrice - decrease
+    await updatePrice(newPrice, -decrease)
   }
 
   return (
@@ -414,22 +428,9 @@ export default function AdminPanel() {
           {/* Auto Mode Settings */}
           {isAutoMode && (
             <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-6">
-              <div className="flex items-center gap-2 mb-4">
+              <div className="flex items-center gap-2">
                 <RefreshCw size={20} className="text-blue-400 animate-spin" />
-                <span className="font-semibold text-blue-400">Chế độ tự động đang bật</span>
-              </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">
-                  Khoảng thời gian cập nhật (giây)
-                </label>
-                <input
-                  type="number"
-                  value={autoInterval}
-                  onChange={(e) => setAutoInterval(parseInt(e.target.value))}
-                  className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2"
-                  min="5"
-                  max="60"
-                />
+                <span className="font-semibold text-blue-400">Chế độ tự động đang bật - Cập nhật giá mỗi 1 giây</span>
               </div>
             </div>
           )}
@@ -490,10 +491,11 @@ export default function AdminPanel() {
         <div className="mt-8 bg-gray-800/50 rounded-lg p-6 border border-gray-700">
           <h3 className="font-bold mb-3">Hướng dẫn:</h3>
           <ul className="space-y-2 text-sm text-gray-300">
-            <li>• <strong>Chế độ tự động:</strong> Giá sẽ tự động thay đổi ngẫu nhiên theo khoảng thời gian đã đặt</li>
+            <li>• <strong>Chế độ tự động:</strong> Giá sẽ tự động thay đổi ngẫu nhiên MỖI 1 GIÂY và phát real-time đến clients</li>
             <li>• <strong>Chế độ thủ công:</strong> Bạn có thể điều chỉnh giá và cập nhật bằng tay</li>
-            <li>• Mỗi vòng kéo dài 15 giây</li>
-            <li>• Hệ thống tự động tính toán kết quả và trả thưởng sau mỗi vòng</li>
+            <li>• Mỗi vòng betting kéo dài 15 giây</li>
+            <li>• Hệ thống tự động tính toán kết quả và trả thưởng khi hết 15 giây</li>
+            <li>• Lịch sử giá được lưu để vẽ biểu đồ real-time</li>
           </ul>
         </div>
       </div>
