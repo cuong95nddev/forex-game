@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
-import { Play, Pause, TrendingUp, TrendingDown, RefreshCw, Settings, Users, Database, AlertTriangle, LayoutDashboard, LogOut } from 'lucide-react'
+import { Play, Pause, TrendingUp, TrendingDown, RefreshCw, Settings, Users, Database, AlertTriangle, LayoutDashboard, LogOut, Clock, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -9,13 +9,25 @@ import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 
 export default function AdminPanel() {
   const [currentPrice, setCurrentPrice] = useState(2000)
   const [priceChange, setPriceChange] = useState(0)
-  const [isAutoMode, setIsAutoMode] = useState(true)
   const [currentRound, setCurrentRound] = useState<any>(null)
   const [countdown, setCountdown] = useState(15)
+  const [showStartDialog, setShowStartDialog] = useState(false)
+  const [isGameRunning, setIsGameRunning] = useState(false)
+  const [isWaitingForConfig, setIsWaitingForConfig] = useState(false)
+  const [newGameConfig, setNewGameConfig] = useState({
+    roundDuration: 15,
+    priceUpdateInterval: 1,
+    winRate: 95,
+    defaultUserBalance: 10000,
+    minBetAmount: 10,
+    maxBetAmount: 50000,
+    noBetPenalty: 0
+  })
   
   // Settings
   const [roundDuration, setRoundDuration] = useState(15) // seconds
@@ -51,22 +63,17 @@ export default function AdminPanel() {
   const isInitialized = useRef(false)
   const pausedCountdown = useRef<number | null>(null)
   const pausedRound = useRef<any>(null)
-
-  console.log('🆔 Admin session ID:', adminSessionId.current)
+  const presenceHeartbeatInterval = useRef<any>(null)
 
   useEffect(() => {
     // Prevent double initialization (React StrictMode)
     if (isInitialized.current) {
-      console.log('⚠️ AdminPanel already initialized, skipping')
       return
     }
     isInitialized.current = true
     
-    console.log('🔄 AdminPanel initializing...')
-    
     const initialize = async () => {
       // Setup broadcast channel
-      console.log('📡 Setting up broadcast channel...')
       broadcastChannel.current = supabase.channel('game-state')
       await broadcastChannel.current.subscribe()
       
@@ -76,30 +83,21 @@ export default function AdminPanel() {
       await loadStats()
       await loadUsers()
       
-      // Auto-start first round if none exists
-      const { data: activeRound } = await supabase
-        .from('rounds')
-        .select('*')
-        .eq('status', 'active')
-        .single()
-      
-      if (!activeRound) {
-        console.log('No active round, starting first round...')
-        await startNewRound(currentPrice)
-      }
-      // Note: Don't call startCountdownTimer here - loadCurrentRound already handles it
-      
-      console.log('✅ AdminPanel initialization complete')
+      // Initialize admin presence
+      await initializeAdminPresence()
     }
     
     initialize()
 
     return () => {
-      console.log('🧹 AdminPanel unmounting, cleaning up...')
       if (countdownInterval.current) {
-        console.log('🧹 Clearing countdown interval on unmount')
         clearInterval(countdownInterval.current)
       }
+      if (presenceHeartbeatInterval.current) {
+        clearInterval(presenceHeartbeatInterval.current)
+      }
+      // Clean up presence on unmount
+      cleanupAdminPresence()
       if (broadcastChannel.current) broadcastChannel.current.unsubscribe()
       isInitialized.current = false
     }
@@ -117,50 +115,34 @@ export default function AdminPanel() {
     return () => clearInterval(statsInterval)
   }, [activeView])
 
-  // Effect to handle auto mode changes - pause/resume countdown
+  // Effect to handle game running state - start/stop countdown
   useEffect(() => {
-    if (!isAutoMode) {
-      // Pause countdown when auto mode is OFF
+    if (!isGameRunning) {
+      // Pause countdown when game is stopped
       if (countdownInterval.current) {
-        console.log('⏸️ Auto mode OFF - Pausing countdown at:', countdown)
-        pausedCountdown.current = countdown
-        pausedRound.current = currentRound
         clearInterval(countdownInterval.current)
         countdownInterval.current = null
         countdownTimerId.current = null
       }
-    } else {
-      // Resume countdown when auto mode is ON
-      if (pausedCountdown.current !== null && pausedRound.current) {
-        console.log('▶️ Auto mode ON - Resuming countdown from:', pausedCountdown.current)
-        const round = pausedRound.current
-        const remainingTime = pausedCountdown.current
-        pausedCountdown.current = null
-        pausedRound.current = null
-        
-        // Resume countdown with remaining time
-        resumeCountdownTimer(round, remainingTime)
-      } else if (currentRound && !countdownInterval.current) {
-        // If there's a current round but no timer running, start fresh
-        console.log('▶️ Auto mode ON - Starting fresh countdown for current round')
-        startCountdownTimer(currentRound)
-      }
+    } else if (isGameRunning && currentRound && !countdownInterval.current) {
+      // Start countdown when game is running and there's a round
+      startCountdownTimer(currentRound)
     }
-  }, [isAutoMode])
+  }, [isGameRunning, currentRound])
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>
 
-    if (isAutoMode) {
+    if (isGameRunning) {
       interval = setInterval(() => {
         handleAutoUpdatePrice()
-      }, priceUpdateInterval * 1000) // Sử dụng priceUpdateInterval
+      }, priceUpdateInterval * 1000)
     }
 
     return () => {
       if (interval) clearInterval(interval)
     }
-  }, [isAutoMode, currentPrice, priceUpdateInterval])
+  }, [isGameRunning, currentPrice, priceUpdateInterval])
 
   const loadSettings = async () => {
     try {
@@ -182,7 +164,7 @@ export default function AdminPanel() {
         setHasUnsavedChanges(false)
       }
     } catch (error) {
-      console.error('Error loading settings:', error)
+      // Error loading settings
     }
   }
 
@@ -206,35 +188,205 @@ export default function AdminPanel() {
         .eq('id', settingsId)
 
       setHasUnsavedChanges(false)
-      toast.success('✅ Đã lưu cấu hình thành công!')
+      toast.success('✅ Settings saved successfully!')
     } catch (error) {
-      console.error('Error saving settings:', error)
-      toast.error('❌ Lỗi khi lưu cấu hình!')
+      toast.error('❌ Error saving settings!')
     } finally {
       setIsSaving(false)
     }
   }
 
-  const applySettings = async () => {
-    if (!confirm('Áp dụng cấu hình mới sẽ kết thúc vòng hiện tại và bắt đầu vòng mới. Bạn có chắc chắn?')) {
+  const deleteCurrentGame = async () => {
+    if (!confirm('Delete the current game? This will end the round and stop the game.')) {
       return
     }
 
-    setIsSaving(true)
     try {
-      // Save settings first
-      await saveSettings()
-
-      // Complete current round if exists
-      if (currentRound) {
-        await completeRound(currentRound)
+      // Stop the game
+      setIsGameRunning(false)
+      if (countdownInterval.current) {
+        clearInterval(countdownInterval.current)
+        countdownInterval.current = null
+        countdownTimerId.current = null
       }
 
-      // Settings will be applied automatically on next round
-      toast.success('✅ Đã áp dụng cấu hình! Vòng mới sẽ bắt đầu với cấu hình mới.')
+      // End current round if exists
+      if (currentRound) {
+        const { error: updateError } = await supabase
+          .from('rounds')
+          .update({
+            status: 'completed',
+            end_time: new Date().toISOString(),
+            end_price: currentPrice
+          })
+          .eq('id', currentRound.id)
+        
+        if (updateError) {
+          console.error('Error updating round status:', updateError)
+          throw updateError
+        }
+        
+        // Clear the current round immediately
+        setCurrentRound(null)
+        setCountdown(0)
+      }
+
+      // Broadcast no active game and clear waiting state
+      if (broadcastChannel.current) {
+        broadcastChannel.current.send({
+          type: 'broadcast',
+          event: 'game-state',
+          payload: {
+            adminSessionId: adminSessionId.current,
+            currentRound: null,
+            countdown: 0,
+            isWaiting: false,
+            goldPrice: { price: currentPrice, change: 0, timestamp: new Date().toISOString() }
+          }
+        })
+      }
+      
+      setIsWaitingForConfig(false)
+
+      await loadStats()
+      // Reload current round to ensure UI is in sync with database
+      await loadCurrentRound()
+      
+      toast.success('🗑️ Current game deleted successfully')
     } catch (error) {
-      console.error('Error applying settings:', error)
-      toast.error('❌ Lỗi khi áp dụng cấu hình!')
+      console.error('Error deleting game:', error)
+      toast.error('❌ Failed to delete current game!')
+    }
+  }
+
+  const prepareForNewGame = async () => {
+    try {
+      // Stop the game
+      setIsGameRunning(false)
+      if (countdownInterval.current) {
+        clearInterval(countdownInterval.current)
+        countdownInterval.current = null
+        countdownTimerId.current = null
+      }
+
+      // End current round if exists
+      if (currentRound) {
+        await supabase
+          .from('rounds')
+          .update({
+            status: 'completed',
+            end_time: new Date().toISOString(),
+            end_price: currentPrice
+          })
+          .eq('id', currentRound.id)
+        
+        setCurrentRound(null)
+      }
+
+      // Set waiting state
+      setIsWaitingForConfig(true)
+      
+      // Broadcast waiting state to all clients
+      if (broadcastChannel.current) {
+        broadcastChannel.current.send({
+          type: 'broadcast',
+          event: 'game-state',
+          payload: {
+            adminSessionId: adminSessionId.current,
+            isWaiting: true
+          }
+        })
+      }
+
+      // Show the config dialog
+      setShowStartDialog(true)
+      toast.info('⏳ Game paused. Configure new game settings.')
+    } catch (error) {
+      toast.error('❌ Failed to prepare for new game!')
+    }
+  }
+
+  const startNewGameSession = async () => {
+    setIsSaving(true)
+    try {
+      // Stop countdown
+      setIsGameRunning(false)
+      if (countdownInterval.current) {
+        clearInterval(countdownInterval.current)
+        countdownInterval.current = null
+        countdownTimerId.current = null
+      }
+
+      // Delete game history (but keep users)
+      await supabase.from('bets').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('rounds').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('gold_prices').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      
+      // Reset all user balances to default instead of deleting them
+      await supabase
+        .from('users')
+        .update({ balance: newGameConfig.defaultUserBalance })
+        .neq('id', '00000000-0000-0000-0000-000000000000')
+      
+      // Update settings with new config
+      if (settingsId) {
+        await supabase
+          .from('game_settings')
+          .update({
+            round_duration: newGameConfig.roundDuration,
+            price_update_interval: newGameConfig.priceUpdateInterval,
+            win_rate: newGameConfig.winRate / 100,
+            default_user_balance: newGameConfig.defaultUserBalance,
+            min_bet_amount: newGameConfig.minBetAmount,
+            max_bet_amount: newGameConfig.maxBetAmount,
+            no_bet_penalty: newGameConfig.noBetPenalty,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', settingsId)
+      }
+      
+      // Reload settings
+      await loadSettings()
+      
+      // Reset state
+      setCurrentPrice(2000)
+      setPriceChange(0)
+      currentPriceRef.current = 2000
+      priceChangeRef.current = 0
+      setCurrentRound(null)
+      setCountdown(newGameConfig.roundDuration)
+      pausedCountdown.current = null
+      pausedRound.current = null
+      setIsWaitingForConfig(false)
+      
+      // Initialize with fresh price
+      await supabase.from('gold_prices').insert({ price: 2000, change: 0 })
+      
+      // Start first round
+      await startNewRound(2000)
+      
+      // Broadcast game started (clear waiting state)
+      if (broadcastChannel.current) {
+        broadcastChannel.current.send({
+          type: 'broadcast',
+          event: 'game-state',
+          payload: {
+            adminSessionId: adminSessionId.current,
+            isWaiting: false
+          }
+        })
+      }
+      
+      // Start game running
+      setIsGameRunning(true)
+      
+      await loadStats()
+      await loadUsers()
+      
+      setShowStartDialog(false)
+      toast.success('🎮 New game session started! Round 1 is now active.')
+    } catch (error) {
+      toast.error('❌ Failed to start new game session!')
     } finally {
       setIsSaving(false)
     }
@@ -252,7 +404,6 @@ export default function AdminPanel() {
       // Validate price - if invalid, reset to 2000
       const validPrice = (data.price >= 1000 && data.price <= 10000) ? data.price : 2000
       if (validPrice !== data.price) {
-        console.warn('⚠️ Invalid price detected:', data.price, '- Resetting to 2000')
         // Insert corrected price
         await supabase
           .from('gold_prices')
@@ -264,7 +415,6 @@ export default function AdminPanel() {
       priceChangeRef.current = validPrice === 2000 ? 0 : data.change
     } else {
       // Insert initial price if none exists
-      console.log('No price data, creating initial price...')
       const { data: newPrice } = await supabase
         .from('gold_prices')
         .insert({ price: 2000, change: 0 })
@@ -286,7 +436,6 @@ export default function AdminPanel() {
     
     // Clear any existing interval first
     if (countdownInterval.current) {
-      console.log('🧹 Clearing existing countdown interval:', countdownTimerId.current)
       clearInterval(countdownInterval.current)
       countdownInterval.current = null
       countdownTimerId.current = null
@@ -298,12 +447,9 @@ export default function AdminPanel() {
     const fixedDuration = roundDuration
     const startTime = Date.now() - ((fixedDuration - remainingSeconds) * 1000)
     
-    console.log('▶️ Resuming countdown timer:', timerId, 'for round:', round.round_number, 'from:', remainingSeconds, 'seconds')
-    
     const updateCountdown = () => {
       // Check if this timer is still the active one
       if (countdownTimerId.current !== timerId) {
-        console.log('⚠️ Timer', timerId, 'is stale, stopping')
         return
       }
       
@@ -312,7 +458,6 @@ export default function AdminPanel() {
       const remaining = Math.max(0, fixedDuration - elapsed)
       
       setCountdown(remaining)
-      console.log('📡 [' + adminSessionId.current.slice(-6) + '] Broadcasting countdown:', remaining)
       
       // Broadcast game state to all clients
       if (broadcastChannel.current) {
@@ -335,7 +480,6 @@ export default function AdminPanel() {
       }
       
       if (remaining === 0) {
-        console.log('⏹️ Timer', timerId, 'completed, clearing interval')
         clearInterval(countdownInterval.current)
         countdownInterval.current = null
         countdownTimerId.current = null
@@ -353,7 +497,6 @@ export default function AdminPanel() {
     
     // Clear any existing interval first
     if (countdownInterval.current) {
-      console.log('🧹 Clearing existing countdown interval:', countdownTimerId.current)
       clearInterval(countdownInterval.current)
       countdownInterval.current = null
       countdownTimerId.current = null
@@ -365,12 +508,10 @@ export default function AdminPanel() {
     // Capture the duration at the start of the round - don't use reactive state
     const fixedDuration = roundDuration
     
-    console.log('🚀 Starting countdown timer:', timerId, 'for round:', round.round_number, 'duration:', fixedDuration)
     
     const updateCountdown = () => {
       // Check if this timer is still the active one
       if (countdownTimerId.current !== timerId) {
-        console.log('⚠️ Timer', timerId, 'is stale, stopping')
         return
       }
       
@@ -379,7 +520,6 @@ export default function AdminPanel() {
       const remaining = Math.max(0, fixedDuration - elapsed)
       
       setCountdown(remaining)
-      console.log('📡 [' + adminSessionId.current.slice(-6) + '] Broadcasting countdown:', remaining)
       
       // Broadcast game state to all clients
       if (broadcastChannel.current) {
@@ -402,7 +542,6 @@ export default function AdminPanel() {
       }
       
       if (remaining === 0) {
-        console.log('⏹️ Timer', timerId, 'completed, clearing interval')
         clearInterval(countdownInterval.current)
         countdownInterval.current = null
         countdownTimerId.current = null
@@ -424,9 +563,52 @@ export default function AdminPanel() {
       .single()
 
     setCurrentRound(data)
-    
-    if (data) {
-      startCountdownTimer(data)
+    // Don't automatically start countdown - wait for auto mode to be enabled
+  }
+
+  const initializeAdminPresence = async () => {
+    try {
+      // Insert admin presence
+      await supabase
+        .from('presence')
+        .upsert({
+          session_id: adminSessionId.current,
+          session_type: 'admin',
+          last_seen: new Date().toISOString(),
+        }, {
+          onConflict: 'session_id'
+        })
+
+      // Start heartbeat to update presence every 2 seconds
+      presenceHeartbeatInterval.current = setInterval(async () => {
+        try {
+          await supabase
+            .from('presence')
+            .update({
+              last_seen: new Date().toISOString(),
+            })
+            .eq('session_id', adminSessionId.current)
+        } catch (error) {
+          console.error('Failed to update admin presence:', error)
+        }
+      }, 2000)
+
+      console.log('Admin presence initialized')
+    } catch (error) {
+      console.error('Failed to initialize admin presence:', error)
+    }
+  }
+
+  const cleanupAdminPresence = async () => {
+    try {
+      await supabase
+        .from('presence')
+        .delete()
+        .eq('session_id', adminSessionId.current)
+      
+      console.log('Admin presence cleaned up')
+    } catch (error) {
+      console.error('Failed to cleanup admin presence:', error)
     }
   }
 
@@ -439,9 +621,12 @@ export default function AdminPanel() {
       .from('bets')
       .select('*', { count: 'exact', head: true })
 
+    // Count online users (active in last 30 seconds)
     const { count: userCount } = await supabase
-      .from('users')
+      .from('presence')
       .select('*', { count: 'exact', head: true })
+      .eq('session_type', 'user')
+      .gte('last_seen', new Date(Date.now() - 30000).toISOString())
 
     setStats({
       totalRounds: roundCount || 0,
@@ -472,7 +657,6 @@ export default function AdminPanel() {
       setEditingUser(null)
       toast.success('Balance updated successfully')
     } catch (error) {
-      console.error('Error updating user balance:', error)
       toast.error('Failed to update balance')
     }
   }
@@ -495,7 +679,6 @@ export default function AdminPanel() {
       await loadStats()
       toast.success('User deleted successfully')
     } catch (error) {
-      console.error('Error deleting user:', error)
       toast.error('Failed to delete user')
     }
   }
@@ -523,7 +706,6 @@ export default function AdminPanel() {
       
       toast.success('Price history cleaned successfully')
     } catch (error) {
-      console.error('Error cleaning price history:', error)
       toast.error('Failed to clean price history')
     }
   }
@@ -563,7 +745,6 @@ export default function AdminPanel() {
       
       toast.success('All data has been reset successfully. You can restart the system now.')
     } catch (error) {
-      console.error('Error resetting data:', error)
       toast.error('Failed to reset data')
     }
   }
@@ -586,7 +767,6 @@ export default function AdminPanel() {
       await loadStats()
       toast.success('Old rounds cleaned successfully')
     } catch (error) {
-      console.error('Error cleaning old rounds:', error)
       toast.error('Failed to clean old rounds')
     }
   }
@@ -606,7 +786,6 @@ export default function AdminPanel() {
       // Validate end price - if invalid, use 2000
       let endPrice = latestPrice.price
       if (endPrice < 1000 || endPrice > 10000 || isNaN(endPrice)) {
-        console.warn('⚠️ Invalid end price:', endPrice, '- Using 2000 instead')
         endPrice = 2000
       }
 
@@ -680,11 +859,9 @@ export default function AdminPanel() {
               .update({ balance: newBalance })
               .eq('id', user.id)
             
-            console.log(`💸 Applied penalty of $${noBetPenalty} to user ${user.name} for not betting`)
           }
 
           if (usersWithoutBets.length > 0) {
-            console.log(`💸 Penalized ${usersWithoutBets.length} users who didn't bet`)
             toast.info(`💸 Penalized ${usersWithoutBets.length} users ($${noBetPenalty} each) for not betting`)
           }
         }
@@ -693,7 +870,6 @@ export default function AdminPanel() {
       // Start new round
       await startNewRound(endPrice)
     } catch (error) {
-      console.error('Error completing round:', error)
     }
   }
 
@@ -730,7 +906,6 @@ export default function AdminPanel() {
     
     // Safety check: if price is invalid, reset to 2000
     if (latestPrice < 1000 || latestPrice > 10000 || isNaN(latestPrice)) {
-      console.warn('⚠️ Invalid price in ref:', latestPrice, '- Resetting to 2000')
       latestPrice = 2000
       currentPriceRef.current = 2000
       setCurrentPrice(2000)
@@ -799,7 +974,6 @@ export default function AdminPanel() {
         await startNewRound(price)
       }
     } catch (error) {
-      console.error('Error updating price:', error)
     }
   }
 
@@ -816,6 +990,107 @@ export default function AdminPanel() {
   }
 
   return (
+    <>
+      {/* Start New Game Dialog */}
+      <Dialog open={showStartDialog} onOpenChange={setShowStartDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Start New Game Session</DialogTitle>
+            <DialogDescription>
+              Configure your game settings. This will reset all game data and start from Round 1.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-6 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Round Duration (seconds)</label>
+                <Input 
+                  type="number" 
+                  value={newGameConfig.roundDuration} 
+                  onChange={(e) => setNewGameConfig({...newGameConfig, roundDuration: parseInt(e.target.value) || 15})}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Price Update Interval (seconds)</label>
+                <Input 
+                  type="number" 
+                  value={newGameConfig.priceUpdateInterval} 
+                  onChange={(e) => setNewGameConfig({...newGameConfig, priceUpdateInterval: parseInt(e.target.value) || 1})}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Win Rate (%)</label>
+                <Input 
+                  type="number" 
+                  value={newGameConfig.winRate} 
+                  onChange={(e) => setNewGameConfig({...newGameConfig, winRate: parseInt(e.target.value) || 95})}
+                />
+                <p className="text-xs text-muted-foreground">Winners get bet × (1 + rate/100)</p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Default Balance ($)</label>
+                <Input 
+                  type="number" 
+                  value={newGameConfig.defaultUserBalance} 
+                  onChange={(e) => setNewGameConfig({...newGameConfig, defaultUserBalance: parseInt(e.target.value) || 10000})}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Min Bet ($)</label>
+                <Input 
+                  type="number" 
+                  value={newGameConfig.minBetAmount} 
+                  onChange={(e) => setNewGameConfig({...newGameConfig, minBetAmount: parseInt(e.target.value) || 10})}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Max Bet ($)</label>
+                <Input 
+                  type="number" 
+                  value={newGameConfig.maxBetAmount} 
+                  onChange={(e) => setNewGameConfig({...newGameConfig, maxBetAmount: parseInt(e.target.value) || 50000})}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">No Bet Penalty ($)</label>
+                <Input 
+                  type="number" 
+                  value={newGameConfig.noBetPenalty} 
+                  onChange={(e) => setNewGameConfig({...newGameConfig, noBetPenalty: parseInt(e.target.value) || 0})}
+                />
+              </div>
+            </div>
+
+            <Alert variant="destructive" className="mt-2">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                <strong>Warning:</strong> Starting a new game will reset all user balances and delete all bets, rounds, and price history. Users will remain registered.
+              </AlertDescription>
+            </Alert>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowStartDialog(false)} disabled={isSaving}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={startNewGameSession} 
+              disabled={isSaving}
+              className="bg-gradient-to-r from-primary to-emerald-600 hover:from-primary/90 hover:to-emerald-600/90"
+            >
+              {isSaving ? 'Starting...' : 'Start New Game'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     <div className="flex h-screen bg-muted/40 text-foreground">
       {/* Sidebar */}
       <aside className="fixed inset-y-0 left-0 z-10 hidden w-64 flex-col border-r bg-background sm:flex">
@@ -871,26 +1146,61 @@ export default function AdminPanel() {
              <h1 className="text-xl font-semibold capitalize">{activeView}</h1>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 gap-1.5 hidden sm:flex">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-              </span>
-              Broadcasting Live
-            </Badge>
+            {isWaitingForConfig && (
+              <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/20 gap-1.5">
+                <Clock size={14} />
+                Waiting for Config
+              </Badge>
+            )}
+            {isGameRunning && (
+              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 gap-1.5 hidden sm:flex">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                </span>
+                Broadcasting Live
+              </Badge>
+            )}
             <Button
-              onClick={() => setIsAutoMode(!isAutoMode)}
+              onClick={prepareForNewGame}
               size="sm"
-              variant={isAutoMode ? "default" : "outline"}
-              className={`${
-                isAutoMode 
-                  ? 'bg-gradient-to-r from-primary to-emerald-600 hover:from-primary/90 hover:to-emerald-600/90' 
-                  : ''
-              }`}
+              className="bg-gradient-to-r from-primary to-emerald-600 hover:from-primary/90 hover:to-emerald-600/90"
             >
-              {isAutoMode ? <Play size={16} className="mr-2" /> : <Pause size={16} className="mr-2" />}
-              {isAutoMode ? 'Auto: ON' : 'Auto: OFF'}
+              <Play size={16} className="mr-2" />
+              Start New Game
             </Button>
+            {currentRound && (
+              <>
+                {isGameRunning ? (
+                  <Button
+                    onClick={() => setIsGameRunning(false)}
+                    size="sm"
+                    variant="outline"
+                  >
+                    <Pause size={16} className="mr-2" />
+                    Pause Game
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => setIsGameRunning(true)}
+                    size="sm"
+                    variant="outline"
+                  >
+                    <Play size={16} className="mr-2" />
+                    Resume Game
+                  </Button>
+                )}
+                <Button
+                  onClick={deleteCurrentGame}
+                  size="sm"
+                  variant="outline"
+                  className="text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2 size={16} className="mr-2" />
+                  Delete Game
+                </Button>
+              </>
+            )}
           </div>
         </header>
         
@@ -907,7 +1217,23 @@ export default function AdminPanel() {
                 </AlertDescription>
               </Alert>
 
-              {/* Stats Grid */}
+              {/* No Active Game State */}
+              {!currentRound && !isGameRunning && !isWaitingForConfig && (
+                <Card className="bg-muted/30 border-dashed">
+                  <CardContent className="flex flex-col items-center justify-center py-12">
+                    <div className="rounded-full bg-muted p-4 mb-4">
+                      <Clock className="h-8 w-8 text-muted-foreground" />
+                    </div>
+                    <h3 className="text-xl font-semibold mb-2">No Active Game</h3>
+                    <p className="text-muted-foreground text-center mb-4">
+                      Click "Start New Game" to begin a new game session
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Stats Grid - Only show when there's an active game */}
+              {currentRound && (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -949,6 +1275,7 @@ export default function AdminPanel() {
                   </CardContent>
                 </Card>
               </div>
+              )}
 
                {/* Current Round Card */}
               {currentRound && (
@@ -980,70 +1307,37 @@ export default function AdminPanel() {
                 </Card>
               )}
 
-              {/* Price Control Section */}
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-                  <Card className="col-span-4">
-                    <CardHeader>
-                      <CardTitle>Price Control</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      {isAutoMode ? (
-                        <div className="flex flex-col items-center justify-center p-8 text-center space-y-4 bg-muted/30 rounded-lg border-2 border-dashed">
-                          <RefreshCw className="h-10 w-10 animate-spin text-primary" />
-                          <div>
-                            <h3 className="font-semibold">Auto Mode Enabled</h3>
-                            <p className="text-sm text-muted-foreground">Price updates automatically every {priceUpdateInterval} seconds</p>
-                          </div>
-                          <Button variant="outline" onClick={() => setIsAutoMode(false)}>Switch to Manual</Button>
-                        </div>
-                      ) : (
-                        <div className="space-y-6">
-                          <div className="flex gap-4">
-                             <Button 
-                               onClick={handlePriceIncrease}
-                               className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white h-24 text-lg font-bold"
-                             >
-                                <TrendingUp className="mr-2 h-6 w-6" /> UP
-                             </Button>
-                             <Button 
-                               onClick={handlePriceDecrease}
-                               className="flex-1 bg-rose-500 hover:bg-rose-600 text-white h-24 text-lg font-bold"
-                             >
-                                <TrendingDown className="mr-2 h-6 w-6" /> DOWN
-                             </Button>
-                          </div>
-                           <div className="grid gap-4">
-                              <div className="grid gap-2">
-                                <label className="text-sm font-medium">Manual Price Set</label>
-                                <div className="flex gap-2">
-                                  <Input 
-                                    type="number" 
-                                    value={currentPrice} 
-                                    onChange={(e) => setCurrentPrice(parseFloat(e.target.value))}
-                                  />
-                                   <Button onClick={handleManualUpdate}>Update</Button>
-                                </div>
-                              </div>
-                           </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                   <Card className="col-span-3">
-                     <CardHeader>
-                       <CardTitle>Live Feed</CardTitle>
-                     </CardHeader>
-                     <CardContent>
-                        <ul className="space-y-2 text-sm">
-                           <li>• Round Duration: <span className="font-mono bg-muted px-1 rounded">{roundDuration}s</span></li>
-                           <li>• Win Rate: <span className="font-mono bg-muted px-1 rounded">{winRate*100}%</span></li>
-                           <li>• Min Bet: <span className="font-mono bg-muted px-1 rounded">${minBetAmount}</span></li>
-                           <li>• Max Bet: <span className="font-mono bg-muted px-1 rounded">${maxBetAmount}</span></li>
-                        </ul>
-                     </CardContent>
-                   </Card>
-              </div>
+              {/* Game Status Section */}
+              {isGameRunning && (
+                <Card className="border-primary/20">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <RefreshCw className="h-5 w-5 animate-spin text-primary" />
+                      Auto Mode Active
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="bg-muted/30 p-4 rounded-lg">
+                        <div className="text-sm text-muted-foreground mb-1">Price Updates</div>
+                        <div className="font-semibold">Every {priceUpdateInterval}s</div>
+                      </div>
+                      <div className="bg-muted/30 p-4 rounded-lg">
+                        <div className="text-sm text-muted-foreground mb-1">Win Rate</div>
+                        <div className="font-semibold">{winRate*100}%</div>
+                      </div>
+                      <div className="bg-muted/30 p-4 rounded-lg">
+                        <div className="text-sm text-muted-foreground mb-1">Bet Range</div>
+                        <div className="font-semibold">${minBetAmount} - ${maxBetAmount}</div>
+                      </div>
+                      <div className="bg-muted/30 p-4 rounded-lg">
+                        <div className="text-sm text-muted-foreground mb-1">No Bet Penalty</div>
+                        <div className="font-semibold">${noBetPenalty}</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           )}
 
@@ -1162,9 +1456,10 @@ export default function AdminPanel() {
                     </div>
                 </CardContent>
                 <div className="p-6 border-t bg-muted/20">
-                    <Button onClick={applySettings} disabled={!hasUnsavedChanges || isSaving} size="lg" className="w-full sm:w-auto">
+                    <Button onClick={saveSettings} disabled={!hasUnsavedChanges || isSaving} size="lg" className="w-full sm:w-auto">
                       {isSaving ? 'Saving...' : 'Save Configuration'}
                     </Button>
+                    <p className="text-xs text-muted-foreground mt-2">Settings will apply to new rounds. To reset and start fresh, use "Start New Game".</p>
                 </div>
               </Card>
             </div>
@@ -1218,6 +1513,7 @@ export default function AdminPanel() {
         </main>
       </div>
     </div>
+    </>
   )
 }
 

@@ -40,6 +40,8 @@ interface AppState {
   loading: boolean
   allUsers: User[]
   lastWinAmount: number | null
+  isWaitingForNewGame: boolean
+  isAdminOnline: boolean
   setLastWinAmount: (amount: number | null) => void
   lastLossAmount: number | null
   setLastLossAmount: (amount: number | null) => void
@@ -50,6 +52,8 @@ interface AppState {
   subscribeToBroadcast: () => void
   subscribeToRounds: () => void
   subscribeToUsers: () => void
+  subscribeToAdminPresence: () => void
+  updateUserPresence: () => Promise<void>
   loadRecentBets: () => Promise<void>
   loadActiveBets: () => Promise<void>
   loadPriceHistory: () => Promise<void>
@@ -62,8 +66,11 @@ let goldPriceChannel: any = null
 let roundsChannel: any = null
 let betsChannel: any = null
 let usersChannel: any = null
+let presenceChannel: any = null
 let subscriptionsActive = false
 let acceptedAdminSession: string | null = null // Only accept broadcasts from one admin
+let userSessionId: string | null = null
+let presenceHeartbeatInterval: any = null
 
 export const useStore = create<AppState>((set, get) => ({
   user: null,
@@ -80,25 +87,23 @@ export const useStore = create<AppState>((set, get) => ({
   lastWinAmount: null,
   lastLossAmount: null,
   loading: false, // Changed default to false
+  isWaitingForNewGame: false,
+  isAdminOnline: false,
 
   setLastWinAmount: (amount) => set({ lastWinAmount: amount }),
   setLastLossAmount: (amount) => set({ lastLossAmount: amount }),
 
   loadUser: async () => {
     try {
-      console.log('🔄 Starting loadUser...')
       set({ loading: true })
       
       // Initialize database with initial data if needed
-      console.log('🔄 Initializing database...')
-      const dbInitialized = await Promise.race([
+      await Promise.race([
         initializeDatabase(),
         new Promise((_, reject) => setTimeout(() => reject(new Error('Database initialization timeout')), 10000))
       ])
-      console.log('✅ Database initialized:', dbInitialized)
       
       const fingerprint = await getFingerprint()
-      console.log('🔑 Got fingerprint:', fingerprint)
       
       const { data: userData, error: userError } = await supabase
         .from('users')
@@ -107,20 +112,16 @@ export const useStore = create<AppState>((set, get) => ({
         .single()
 
       if (userError && userError.code !== 'PGRST116') {
-        console.error('❌ Error loading user:', userError)
         set({ loading: false })
         return
       }
 
       if (userData) {
-        console.log('✅ User found:', userData.name)
         set({ user: userData })
       } else {
-        console.log('ℹ️ No user found for this device')
       }
 
       // Load latest gold price
-      console.log('🔄 Loading gold price...')
       const { data: priceData } = await supabase
         .from('gold_prices')
         .select('*')
@@ -129,12 +130,10 @@ export const useStore = create<AppState>((set, get) => ({
         .single()
 
       if (priceData) {
-        console.log('✅ Gold price loaded:', priceData.price)
         set({ goldPrice: priceData })
       }
 
       // Load current round
-      console.log('🔄 Loading current round...')
       const { data: roundData } = await supabase
         .from('rounds')
         .select('*')
@@ -144,7 +143,6 @@ export const useStore = create<AppState>((set, get) => ({
         .single()
 
       if (roundData) {
-        console.log('✅ Active round found:', roundData.round_number)
         set({ currentRound: roundData, countdown: 0 }) // Set countdown to 0, wait for broadcast from admin
         
         // Check if user has bet in this round
@@ -157,18 +155,14 @@ export const useStore = create<AppState>((set, get) => ({
             .single()
 
           if (betData) {
-            console.log('✅ User bet found:', betData.prediction)
             set({ userBet: betData })
           }
         }
       } else {
-        console.log('ℹ️ No active round found')
       }
 
-      console.log('✅ loadUser completed successfully')
       set({ loading: false })
     } catch (error) {
-      console.error('❌ Error in loadUser:', error)
       set({ loading: false })
     }
   },
@@ -193,13 +187,11 @@ export const useStore = create<AppState>((set, get) => ({
         .single()
 
       if (userError) {
-        console.error('User creation error:', userError)
         throw new Error(`Failed to create user: ${userError.message} (Code: ${userError.code})`)
       }
 
       set({ user: newUser })
     } catch (error) {
-      console.error('Error initializing user:', error)
       throw error
     }
   },
@@ -208,17 +200,17 @@ export const useStore = create<AppState>((set, get) => ({
     const { user, currentRound, countdown } = get()
     
     if (!user || !currentRound) {
-      toast.error('Không thể đặt cược ngay bây giờ!')
+      toast.error('Cannot place bet right now!')
       return false
     }
 
     if (countdown <= 0) {
-      toast.warning('Hết thời gian đặt cược cho vòng này!')
+      toast.warning('Betting time is over for this round!')
       return false
     }
 
     if (user.balance < amount) {
-      toast.error('Số dư không đủ!')
+      toast.error('Insufficient balance!')
       return false
     }
 
@@ -233,12 +225,12 @@ export const useStore = create<AppState>((set, get) => ({
     const maxBet = settings?.max_bet_amount || 50000
 
     if (amount < minBet) {
-      toast.warning(`Số tiền cược tối thiểu là $${minBet}!`)
+      toast.warning(`Minimum bet amount is $${minBet}!`)
       return false
     }
 
     if (amount > maxBet) {
-      toast.warning(`Số tiền cược tối đa là $${maxBet.toLocaleString()}!`)
+      toast.warning(`Maximum bet amount is $${maxBet.toLocaleString()}!`)
       return false
     }
 
@@ -263,13 +255,12 @@ export const useStore = create<AppState>((set, get) => ({
         .single()
 
       if (betError) {
-        console.error('Bet error:', betError)
         // Refund if bet fails
         await supabase
           .from('users')
           .update({ balance: user.balance })
           .eq('id', user.id)
-        toast.error('Không thể đặt cược! Có thể bạn đã đặt cược trong vòng này rồi.')
+        toast.error('Cannot place bet! You may have already placed a bet in this round.')
         return false
       }
 
@@ -280,7 +271,6 @@ export const useStore = create<AppState>((set, get) => ({
 
       return true
     } catch (error) {
-      console.error('Error placing bet:', error)
       return false
     }
   },
@@ -288,7 +278,6 @@ export const useStore = create<AppState>((set, get) => ({
   subscribeToGoldPrice: () => {
     // Clean up existing channel if it exists
     if (goldPriceChannel) {
-      console.log('🧹 Cleaning up existing gold price channel')
       goldPriceChannel.unsubscribe()
       goldPriceChannel = null
     }
@@ -296,19 +285,16 @@ export const useStore = create<AppState>((set, get) => ({
     // Note: We're not subscribing to postgres_changes for gold_prices
     // because it can cause realtime binding errors.
     // Gold prices will be updated via the broadcast channel from admin.
-    console.log('⏭️ Skipping gold price postgres subscription (using broadcast only)')
   },
 
   subscribeToBroadcast: () => {
     // Prevent duplicate subscriptions
     if (subscriptionsActive && broadcastChannel) {
-      console.log('⚠️ Broadcast subscription already active, skipping')
       return
     }
     
     // Clean up existing channel if it exists
     if (broadcastChannel) {
-      console.log('🧹 Cleaning up existing broadcast channel')
       broadcastChannel.unsubscribe()
       broadcastChannel = null
     }
@@ -318,35 +304,47 @@ export const useStore = create<AppState>((set, get) => ({
     
     broadcastChannel
       .on('broadcast', { event: 'game-state' }, (payload: any) => {
-        const { countdown, currentRound, goldPrice, winRate: broadcastWinRate, adminSessionId } = payload.payload
+        const { countdown, currentRound, goldPrice, winRate: broadcastWinRate, adminSessionId, isWaiting } = payload.payload
+        
+        
+        // Handle waiting state
+        if (isWaiting !== undefined) {
+          set({ isWaitingForNewGame: isWaiting })
+          if (isWaiting) {
+            // Clear current round when waiting for new game
+            set({ currentRound: null, userBet: null, countdown: 0 })
+            return // Don't process other updates when in waiting state
+          }
+        }
         
         // If this is from a new admin session, accept it (first one wins, or reset on new round)
         if (adminSessionId) {
           if (!acceptedAdminSession) {
             acceptedAdminSession = adminSessionId
-            console.log('🔒 Locked to admin session:', adminSessionId)
           } else if (acceptedAdminSession !== adminSessionId) {
             // Ignore broadcasts from other admin sessions
-            console.log('⚠️ Ignoring broadcast from different admin:', adminSessionId.slice(-6), '(locked to:', acceptedAdminSession.slice(-6) + ')')
             return
           }
         }
         
         // Update countdown from admin broadcast - this is the source of truth
         if (countdown !== undefined) {
-          console.log('⏱️ Countdown updated from admin:', countdown, 'session:', adminSessionId?.slice(-6) || 'unknown')
           set({ countdown })
         }
         
         // Update current round if provided - reset admin lock on new round
-        if (currentRound !== undefined) {
+        if ('currentRound' in payload.payload) {
           const oldRound = get().currentRound
-          if (oldRound && currentRound.id !== oldRound.id) {
+          if (oldRound && currentRound && currentRound.id !== oldRound.id) {
             // New round started, reset admin lock to allow any admin
             acceptedAdminSession = adminSessionId || null
-            console.log('🔄 New round, reset admin lock to:', acceptedAdminSession?.slice(-6) || 'none')
           }
-          set({ currentRound })
+          // If currentRound is null, clear userBet as well
+          if (currentRound === null) {
+            set({ currentRound: null, userBet: null })
+          } else {
+            set({ currentRound })
+          }
         }
         
         // Update winRate if provided
@@ -408,7 +406,6 @@ export const useStore = create<AppState>((set, get) => ({
         set({ recentBets: data })
       }
     } catch (error) {
-      console.error('Error loading recent bets:', error)
     }
   },
 
@@ -424,7 +421,6 @@ export const useStore = create<AppState>((set, get) => ({
         set({ activeBets: data })
       }
     } catch (error) {
-      console.error('Error loading active bets:', error)
     }
   },
 
@@ -441,21 +437,22 @@ export const useStore = create<AppState>((set, get) => ({
         set({ priceHistory: data.reverse() })
       }
     } catch (error) {
-      console.error('Error loading price history:', error)
     }
   },
 
   loadOnlineUsers: async () => {
     try {
+      // Count users active in last 30 seconds
       const { count } = await supabase
-        .from('users')
+        .from('presence')
         .select('*', { count: 'exact', head: true })
+        .eq('session_type', 'user')
+        .gte('last_seen', new Date(Date.now() - 30000).toISOString())
 
       if (count !== null) {
         set({ onlineUsers: count })
       }
     } catch (error) {
-      console.error('Error loading online users:', error)
     }
   },
 
@@ -470,25 +467,21 @@ export const useStore = create<AppState>((set, get) => ({
         set({ allUsers: data })
       }
     } catch (error) {
-      console.error('Error loading all users:', error)
     }
   },
 
   subscribeToRounds: () => {
     // Prevent duplicate subscriptions
     if (subscriptionsActive && (roundsChannel || betsChannel)) {
-      console.log('⚠️ Rounds/Bets subscriptions already active, skipping')
       return
     }
     
     // Clean up existing channels if they exist
     if (roundsChannel) {
-      console.log('🧹 Cleaning up existing rounds channel')
       roundsChannel.unsubscribe()
       roundsChannel = null
     }
     if (betsChannel) {
-      console.log('🧹 Cleaning up existing bets channel')
       betsChannel.unsubscribe()
       betsChannel = null
     }
@@ -591,14 +584,12 @@ export const useStore = create<AppState>((set, get) => ({
   subscribeToUsers: () => {
     // Clean up existing channel if it exists
     if (usersChannel) {
-      console.log('🧹 Cleaning up existing users channel')
       usersChannel.unsubscribe()
       usersChannel = null
     }
     
     const currentUser = get().user
     if (!currentUser) {
-      console.log('⚠️ No user found, skipping user subscription')
       return
     }
     
@@ -617,12 +608,6 @@ export const useStore = create<AppState>((set, get) => ({
           const updatedUser = payload.new as User
           const oldUser = payload.old as User
           
-          console.log('💰 User balance changed:', {
-            old: oldUser.balance,
-            new: updatedUser.balance,
-            change: updatedUser.balance - oldUser.balance
-          })
-          
           // Update user state
           set({ user: updatedUser })
           
@@ -639,23 +624,125 @@ export const useStore = create<AppState>((set, get) => ({
             
             if (isPenalty) {
               const penaltyAmount = Math.abs(balanceChange)
-              console.log('💸 Penalty detected:', penaltyAmount)
-              toast.error(`⚠️ Bạn bị phạt $${penaltyAmount.toFixed(2)} vì không đặt cược!`, {
+              toast.error(`⚠️ You were penalized $${penaltyAmount.toFixed(2)} for not placing a bet!`, {
                 duration: 6000,
-                description: 'Đặt cược trong vòng tiếp theo để tránh bị phạt!'
+                description: 'Place a bet in the next round to avoid penalty!'
               })
             }
           } else if (balanceChange > 0) {
             // Balance increased - user won or got refund
-            console.log('💰 Balance increased:', balanceChange)
           }
         }
       )
       .subscribe((status) => {
-        console.log('👤 User subscription status:', status)
         if (status === 'SUBSCRIBED') {
-          console.log('✅ Successfully subscribed to user balance changes for user:', currentUser.id)
         }
       })
+  },
+
+  subscribeToAdminPresence: () => {
+    // Clean up existing channel if it exists
+    if (presenceChannel) {
+      presenceChannel.unsubscribe()
+      presenceChannel = null
+    }
+
+    // Check for admin presence
+    const checkAdminPresence = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('presence')
+          .select('*')
+          .eq('session_type', 'admin')
+          .gte('last_seen', new Date(Date.now() - 15000).toISOString()) // Active in last 15 seconds
+          .limit(1)
+          .single()
+
+        const adminOnline = !error && data !== null
+        set({ isAdminOnline: adminOnline })
+      } catch (error) {
+        set({ isAdminOnline: false })
+      }
+    }
+
+    // Initial check
+    checkAdminPresence()
+
+    // Subscribe to presence changes
+    presenceChannel = supabase
+      .channel('presence-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'presence',
+        },
+        () => {
+          checkAdminPresence()
+        }
+      )
+      .subscribe()
+
+    // Poll every 5 seconds as backup
+    const presenceCheckInterval = setInterval(checkAdminPresence, 5000)
+
+    // Clean up on unmount
+    return () => {
+      clearInterval(presenceCheckInterval)
+      if (presenceChannel) {
+        presenceChannel.unsubscribe()
+        presenceChannel = null
+      }
+    }
+  },
+
+  updateUserPresence: async () => {
+    const { user } = get()
+    if (!user) return
+
+    // Generate or use existing session ID
+    if (!userSessionId) {
+      userSessionId = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    }
+
+    try {
+      // Upsert presence
+      await supabase
+        .from('presence')
+        .upsert({
+          session_id: userSessionId,
+          session_type: 'user',
+          user_id: user.id,
+          last_seen: new Date().toISOString(),
+        }, {
+          onConflict: 'session_id'
+        })
+
+      // Start heartbeat if not already running
+      if (!presenceHeartbeatInterval) {
+        presenceHeartbeatInterval = setInterval(async () => {
+          const currentUser = get().user
+          if (!currentUser || !userSessionId) {
+            clearInterval(presenceHeartbeatInterval)
+            presenceHeartbeatInterval = null
+            return
+          }
+
+          try {
+            await supabase
+              .from('presence')
+              .update({
+                last_seen: new Date().toISOString(),
+              })
+              .eq('session_id', userSessionId)
+          } catch (error) {
+            console.error('Failed to update user presence:', error)
+          }
+        }, 2000) // Update every 2 seconds
+      }
+    } catch (error) {
+      console.error('Failed to initialize user presence:', error)
+    }
   },
 }))

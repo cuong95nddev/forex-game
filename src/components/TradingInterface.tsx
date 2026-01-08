@@ -33,7 +33,8 @@ export default function TradingInterface() {
     lastWinAmount,
     setLastWinAmount,
     lastLossAmount,
-    setLastLossAmount
+    setLastLossAmount,
+    isWaitingForNewGame
   } = useStore()
   
   const [betAmount, setBetAmount] = useState('100')
@@ -149,12 +150,12 @@ export default function TradingInterface() {
   const handleBet = async (prediction: 'up' | 'down') => {
     const amount = parseFloat(betAmount)
     if (isNaN(amount) || amount <= 0) {
-      toast.error('Số tiền không hợp lệ!')
+      toast.error('Invalid amount!')
       return
     }
     
     if (!user || amount > user.balance) {
-      toast.error('Số dư không đủ!')
+      toast.error('Insufficient balance!')
       return
     }
 
@@ -169,7 +170,33 @@ export default function TradingInterface() {
       <div className="min-h-screen bg-[#0b0f13] flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#f59e0b] mx-auto mb-4"></div>
-          <p className="text-[#94a3b8]">Đang kết nối thị trường...</p>
+          <p className="text-[#94a3b8]">Connecting to market...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show waiting state when admin is configuring new game or no active game
+  if (isWaitingForNewGame || !currentRound) {
+    return (
+      <div className="min-h-screen bg-[#0b0f13] flex items-center justify-center">
+        <div className="text-center space-y-6 max-w-md px-6">
+          <div className="relative">
+            <div className="animate-spin rounded-full h-20 w-20 border-4 border-[#f59e0b]/20 border-t-[#f59e0b] mx-auto"></div>
+            <Clock className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-8 w-8 text-[#f59e0b]" />
+          </div>
+          <div>
+            <h2 className="text-3xl font-bold text-white mb-2">Please wait...</h2>
+            <p className="text-[#94a3b8] text-lg">
+              {isWaitingForNewGame ? 'Admin is preparing new game' : 'Waiting for game to start'}
+            </p>
+            <p className="text-[#64748b] text-sm mt-4">Game will start shortly</p>
+          </div>
+          <div className="flex justify-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-[#f59e0b] animate-bounce" style={{ animationDelay: '0ms' }}></div>
+            <div className="h-2 w-2 rounded-full bg-[#f59e0b] animate-bounce" style={{ animationDelay: '150ms' }}></div>
+            <div className="h-2 w-2 rounded-full bg-[#f59e0b] animate-bounce" style={{ animationDelay: '300ms' }}></div>
+          </div>
         </div>
       </div>
     )
