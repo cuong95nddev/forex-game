@@ -183,15 +183,15 @@ export default function TradingInterface() {
       <div className="min-h-screen bg-[#0b0f13] flex items-center justify-center p-6">
         <div className="text-center space-y-6 max-w-2xl w-full px-6">
           <div className="relative">
-            <div className="animate-spin rounded-full h-20 w-20 border-4 border-[#f59e0b]/20 border-t-[#f59e0b] mx-auto"></div>
-            <Clock className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-8 w-8 text-[#f59e0b]" />
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-[#f59e0b]/20 border-t-[#f59e0b] mx-auto"></div>
+            <Clock className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-6 w-6 text-[#f59e0b]" />
           </div>
           <div>
-            <h2 className="text-3xl font-bold text-white mb-2">Please wait...</h2>
-            <p className="text-[#94a3b8] text-lg">
+            <h2 className="text-xl font-bold text-white uppercase tracking-wider mb-2">Please wait...</h2>
+            <p className="text-[#94a3b8] text-sm">
               {isWaitingForNewGame ? 'Admin is preparing new game' : 'Waiting for game to start'}
             </p>
-            <p className="text-[#64748b] text-sm mt-4">Game will start shortly</p>
+            <p className="text-[#64748b] text-xs mt-2">Game will start shortly</p>
           </div>
           
           {/* Online Users List */}

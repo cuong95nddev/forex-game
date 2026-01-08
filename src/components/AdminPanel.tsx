@@ -989,7 +989,7 @@ export default function AdminPanel() {
     <div className="flex h-screen bg-[#0b0f13] text-white font-sans overflow-hidden select-none">
       {/* Start New Game Dialog */}
       <Dialog open={showStartDialog} onOpenChange={setShowStartDialog}>
-        <DialogContent className="max-w-2xl bg-[#0f172a] border-[#1e293b] text-white">
+        <DialogContent className="max-w-2xl bg-[#0b0f13] border-[#1e293b] text-white">
           <DialogHeader>
             <DialogTitle className="text-white">Start New Game Session</DialogTitle>
             <DialogDescription className="text-[#94a3b8]">
@@ -1094,7 +1094,7 @@ export default function AdminPanel() {
       </Dialog>
 
       {/* Sidebar */}
-      <aside className="w-[240px] bg-[#0f172a] border-r border-[#1e293b] flex flex-col hidden sm:flex z-50">
+      <aside className="w-[240px] bg-[#0b0f13] border-r border-[#1e293b] flex flex-col hidden sm:flex z-50">
         <div className="h-14 flex items-center px-6 border-b border-[#1e293b]">
           <div className="flex items-center gap-2 font-bold text-white">
             <div className="w-8 h-8 rounded bg-[#f59e0b] flex items-center justify-center text-black shadow-lg shadow-[#f59e0b]/20">
@@ -1126,9 +1126,9 @@ export default function AdminPanel() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-14 bg-[#0f172a] border-b border-[#1e293b] flex items-center px-6 justify-between shrink-0">
+        <header className="h-14 bg-[#0b0f13] border-b border-[#1e293b] flex items-center px-6 justify-between shrink-0">
           <div className="flex items-center gap-2">
-            <h1 className="font-bold text-sm uppercase tracking-wider text-white">{activeView}</h1>
+            <h1 className="font-bold text-xs uppercase tracking-widest text-white">{activeView}</h1>
           </div>
           
           <div className="flex items-center gap-3">
@@ -1192,9 +1192,9 @@ export default function AdminPanel() {
             <div className="space-y-6">
               {/* Warning Banner */}
               <div className="bg-[#f59e0b]/10 border border-[#f59e0b]/20 p-4 rounded-lg flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-[#f59e0b] shrink-0" />
+                <AlertTriangle className="h-4 w-4 text-[#f59e0b] shrink-0" />
                  <div>
-                  <h4 className="text-[#f59e0b] font-bold text-sm">BROADCAST ACTIVE</h4>
+                  <h4 className="text-[#f59e0b] font-bold text-xs uppercase tracking-wider">Broadcast Active</h4>
                   <p className="text-[#94a3b8] text-xs mt-1">
                     Keep this page open to maintain game broadcast. Closing it will stop the game.
                   </p>
@@ -1203,15 +1203,15 @@ export default function AdminPanel() {
 
               {/* No Active Game State */}
               {!currentRound && !isGameRunning && !isWaitingForConfig && (
-                <div className="border border-dashed border-[#1e293b] rounded-xl bg-[#0f172a]/50 p-12 flex flex-col items-center justify-center text-center">
+                <div className="border border-dashed border-[#1e293b] rounded-xl bg-[#0b0f13]/50 p-12 flex flex-col items-center justify-center text-center">
                     <div className="rounded-full bg-[#1e293b] p-4 mb-4">
                       <Clock className="h-8 w-8 text-[#94a3b8]" />
                     </div>
-                    <h3 className="text-xl font-semibold mb-2 text-white">No Active Game</h3>
-                    <p className="text-[#94a3b8] mb-6 max-w-sm text-sm">
+                    <h3 className="text-sm font-bold mb-2 text-white uppercase tracking-wider">No Active Game</h3>
+                    <p className="text-[#94a3b8] mb-6 max-w-sm text-xs">
                       Start a new game session to begin trading rounds and broadcasts.
                     </p>
-                    <Button onClick={prepareForNewGame} className="bg-[#10b981] hover:bg-[#059669] text-white">
+                    <Button onClick={prepareForNewGame} className="bg-[#10b981] hover:bg-[#059669] text-white text-xs font-bold uppercase tracking-wider">
                       Initialize Game System
                     </Button>
                 </div>
@@ -1226,7 +1226,7 @@ export default function AdminPanel() {
                   { label: 'Total Bets', value: stats.totalBets, icon: Database },
                   { label: 'Current Price', value: `$${currentPrice.toFixed(2)}`, sub: `${priceChange >= 0 ? '+' : ''}${priceChange.toFixed(2)}`, icon: TrendingUp, color: priceChange >= 0 ? 'text-[#10b981]' : 'text-[#ef4444]' },
                 ].map((stat, i) => (
-                  <div key={i} className="bg-[#0f172a] border border-[#1e293b] p-4 rounded-lg">
+                  <div key={i} className="bg-[#0b0f13] border border-[#1e293b] p-4 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
                        <span className="text-[#94a3b8] text-[10px] uppercase font-bold tracking-wider">{stat.label}</span>
                        <stat.icon size={14} className="text-[#94a3b8]" />
@@ -1244,11 +1244,11 @@ export default function AdminPanel() {
 
                {/* Current Round Card */}
               {currentRound && (
-                <div className="bg-[#0f172a] border border-[#1e293b] rounded-lg overflow-hidden">
+                <div className="bg-[#0b0f13] border border-[#1e293b] rounded-lg overflow-hidden">
                   <div className="border-b border-[#1e293b] bg-[#1e293b]/30 px-6 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                       <RefreshCw className="h-5 w-5 animate-spin text-[#f59e0b]" />
-                       <h3 className="font-bold text-white">Round #{currentRound.round_number}</h3>
+                       <RefreshCw className="h-4 w-4 animate-spin text-[#f59e0b]" />
+                       <h3 className="font-bold text-white text-xs uppercase tracking-wider">Round #{currentRound.round_number}</h3>
                     </div>
                     <Badge variant="outline" className="border-[#10b981] text-[#10b981] bg-[#10b981]/10">ACTIVE</Badge>
                   </div>
@@ -1276,8 +1276,8 @@ export default function AdminPanel() {
 
               {/* Auto Mode Config View */}
               {isGameRunning && (
-                <div className="bg-[#0f172a] border border-[#1e293b] rounded-lg p-6">
-                  <h3 className="font-bold text-white mb-4 text-sm uppercase tracking-wider">Configuration</h3>
+                <div className="bg-[#0b0f13] border border-[#1e293b] rounded-lg p-6">
+                  <h3 className="font-bold text-white mb-4 text-xs uppercase tracking-widest">Configuration</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       {[
                         { label: 'Update Interval', value: `${priceUpdateInterval}s` },
@@ -1298,9 +1298,9 @@ export default function AdminPanel() {
 
           {/* Users View */}
           {activeView === 'users' && (
-             <div className="bg-[#0f172a] border border-[#1e293b] rounded-lg flex flex-col h-[600px]">
-              <div className="p-4 border-b border-[#1e293b]">
-                <h3 className="font-bold text-white">User Management</h3>
+             <div className="bg-[#0b0f13] border border-[#1e293b] rounded-lg flex flex-col h-[600px]">
+              <div className="p-4 border-b border-[#1e293b] bg-[#1e293b]/20">
+                <h3 className="font-bold text-white text-xs uppercase tracking-widest">User Management</h3>
               </div>
               <ScrollArea className="flex-1">
                  <Table>
@@ -1360,9 +1360,9 @@ export default function AdminPanel() {
           {/* Settings View */}
           {activeView === 'settings' && (
             <div className="max-w-4xl space-y-6">
-              <div className="bg-[#0f172a] border border-[#1e293b] rounded-lg p-6">
-                <h3 className="font-bold text-white mb-1">Game Configuration</h3>
-                <p className="text-sm text-[#94a3b8] mb-6">Adjust the core mechanics of the game rounds.</p>
+              <div className="bg-[#0b0f13] border border-[#1e293b] rounded-lg p-6">
+                <h3 className="font-bold text-white mb-1 text-xs uppercase tracking-widest">Game Configuration</h3>
+                <p className="text-xs text-[#94a3b8] mb-6">Adjust the core mechanics of the game rounds.</p>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
@@ -1380,9 +1380,9 @@ export default function AdminPanel() {
                 </div>
               </div>
 
-              <div className="bg-[#0f172a] border border-[#1e293b] rounded-lg p-6">
-                <h3 className="font-bold text-white mb-1">Financial Limits</h3>
-                <p className="text-sm text-[#94a3b8] mb-6">Set limits for betting and balances.</p>
+              <div className="bg-[#0b0f13] border border-[#1e293b] rounded-lg p-6">
+                <h3 className="font-bold text-white mb-1 text-xs uppercase tracking-widest">Financial Limits</h3>
+                <p className="text-xs text-[#94a3b8] mb-6">Set limits for betting and balances.</p>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
@@ -1404,8 +1404,8 @@ export default function AdminPanel() {
                 </div>
 
                 <div className="mt-6 pt-6 border-t border-[#1e293b]">
-                    <Button onClick={saveSettings} disabled={!hasUnsavedChanges || isSaving} className="w-full sm:w-auto bg-[#10b981] hover:bg-[#059669] text-white font-bold">
-                      {isSaving ? 'Saving...' : 'SAVE CONFIGURATION'}
+                    <Button onClick={saveSettings} disabled={!hasUnsavedChanges || isSaving} className="w-full sm:w-auto bg-[#10b981] hover:bg-[#059669] text-white font-bold text-xs uppercase tracking-wider">
+                      {isSaving ? 'Saving...' : 'Save Configuration'}
                     </Button>
                 </div>
               </div>
@@ -1415,8 +1415,8 @@ export default function AdminPanel() {
           {/* Data View */}
           {activeView === 'data' && (
             <div className="max-w-4xl space-y-6">
-               <div className="bg-[#0f172a] border border-[#1e293b] rounded-lg p-6">
-                 <h3 className="font-bold text-white mb-4">Database Maintenance</h3>
+               <div className="bg-[#0b0f13] border border-[#1e293b] rounded-lg p-6">
+                 <h3 className="font-bold text-white mb-4 text-xs uppercase tracking-widest">Database Maintenance</h3>
                  <div className="space-y-4">
                     <div className="flex items-center justify-between p-4 border border-[#1e293b] rounded-lg bg-[#1e293b]/30">
                       <div>
@@ -1435,14 +1435,14 @@ export default function AdminPanel() {
                  </div>
                </div>
 
-               <div className="bg-[#0f172a] border border-[#ef4444]/30 rounded-lg p-6">
-                 <h3 className="font-bold text-[#ef4444] mb-4">Danger Zone</h3>
+               <div className="bg-[#0b0f13] border border-[#ef4444]/30 rounded-lg p-6">
+                 <h3 className="font-bold text-[#ef4444] mb-4 text-xs uppercase tracking-widest">Danger Zone</h3>
                  <div className="space-y-4">
-                    <div className="bg-[#ef4444]/10 border border-[#ef4444]/20 p-4 rounded-lg flex items-start gap-3 text-[#ef4444] text-sm">
-                      <AlertTriangle className="h-5 w-5 shrink-0" />
+                    <div className="bg-[#ef4444]/10 border border-[#ef4444]/20 p-4 rounded-lg flex items-start gap-3 text-[#ef4444] text-xs">
+                      <AlertTriangle className="h-4 w-4 shrink-0" />
                       <p>This action will wipe ALL data including users, bets, and settings. This cannot be undone.</p>
                     </div>
-                    <Button variant="destructive" className="w-full" onClick={() => setShowResetAllDialog(true)}>RESET ENTIRE SYSTEM</Button>
+                    <Button variant="destructive" className="w-full text-xs uppercase tracking-wider font-bold" onClick={() => setShowResetAllDialog(true)}>Reset Entire System</Button>
                  </div>
                </div>
             </div>
@@ -1453,7 +1453,7 @@ export default function AdminPanel() {
 
       {/* Delete Game Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent className="bg-[#0f172a] border-[#1e293b] text-white">
+        <DialogContent className="bg-[#0b0f13] border-[#1e293b] text-white">
           <DialogHeader>
             <DialogTitle className="text-white">Delete Current Game?</DialogTitle>
             <DialogDescription className="text-[#94a3b8]">
@@ -1479,7 +1479,7 @@ export default function AdminPanel() {
 
       {/* Delete User Confirmation Dialog */}
       <Dialog open={showDeleteUserDialog} onOpenChange={setShowDeleteUserDialog}>
-        <DialogContent className="bg-[#0f172a] border-[#1e293b] text-white">
+        <DialogContent className="bg-[#0b0f13] border-[#1e293b] text-white">
           <DialogHeader>
             <DialogTitle className="text-white">Delete User?</DialogTitle>
             <DialogDescription className="text-[#94a3b8]">
@@ -1508,7 +1508,7 @@ export default function AdminPanel() {
 
       {/* Clean Price History Dialog */}
       <Dialog open={showCleanPricesDialog} onOpenChange={setShowCleanPricesDialog}>
-        <DialogContent className="bg-[#0f172a] border-[#1e293b] text-white">
+        <DialogContent className="bg-[#0b0f13] border-[#1e293b] text-white">
           <DialogHeader>
             <DialogTitle className="text-white">Clean Price History?</DialogTitle>
             <DialogDescription className="text-[#94a3b8]">
@@ -1534,7 +1534,7 @@ export default function AdminPanel() {
 
       {/* Clean Old Rounds Dialog */}
       <Dialog open={showCleanRoundsDialog} onOpenChange={setShowCleanRoundsDialog}>
-        <DialogContent className="bg-[#0f172a] border-[#1e293b] text-white">
+        <DialogContent className="bg-[#0b0f13] border-[#1e293b] text-white">
           <DialogHeader>
             <DialogTitle className="text-white">Clean Old Rounds?</DialogTitle>
             <DialogDescription className="text-[#94a3b8]">
@@ -1560,7 +1560,7 @@ export default function AdminPanel() {
 
       {/* Reset All Data Dialog */}
       <Dialog open={showResetAllDialog} onOpenChange={setShowResetAllDialog}>
-        <DialogContent className="bg-[#0f172a] border-[#1e293b] text-white">
+        <DialogContent className="bg-[#0b0f13] border-[#1e293b] text-white">
           <DialogHeader>
             <DialogTitle className="text-white text-destructive">⚠️ DANGER: Reset Entire System?</DialogTitle>
             <DialogDescription className="space-y-2 text-[#94a3b8]">

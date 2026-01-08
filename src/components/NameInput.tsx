@@ -113,50 +113,33 @@ export const NameInput: React.FC<NameInputProps> = ({ onSubmit }) => {
   // Show locked screen if game already started
   if (gameStarted) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-[#0f172a]">
-        <div className="max-w-md w-full animate-in fade-in zoom-in duration-300">
-          <Card className="bg-[#1e293b] border-[#334155] shadow-2xl overflow-hidden relative">
-             {/* Background decorative elements */}
-             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#ef4444] to-transparent opacity-50"></div>
-             
-             <CardContent className="pt-10 pb-8 px-8">
-              <div className="text-center flex flex-col items-center">
-                
-                <div className="mb-6 relative">
-                  <div className="absolute -inset-4 bg-[#ef4444]/10 rounded-full blur-lg animate-pulse"></div>
-                  <div className="bg-[#0f172a] p-4 rounded-full border border-[#ef4444]/30 relative z-10 shadow-lg shadow-[#ef4444]/10">
-                    <Hourglass className="w-10 h-10 text-[#ef4444] animate-[spin_3s_linear_infinite]" />
-                  </div>
-                </div>
-                
-                <h3 className="text-2xl font-bold text-white mb-2 tracking-tight">Game in Progress</h3>
-                
-                <p className="text-[#94a3b8] text-sm leading-relaxed mb-8 max-w-[260px] mx-auto">
-                   A trading round is currently active. Access is temporarily locked until the round completes.
-                </p>
-
-                <div className="w-full space-y-4">
-                   <div className="flex items-center justify-center gap-2 text-xs font-bold text-[#f59e0b] bg-[#f59e0b]/10 py-2 px-4 rounded-full border border-[#f59e0b]/20">
-                      <div className="w-2 h-2 bg-[#f59e0b] rounded-full animate-ping"></div>
-                      Monitoring Status...
-                   </div>
-                   
-                   <Button
-                      onClick={() => checkGameStatus()}
-                      variant="outline"
-                      className="w-full border-[#334155] text-[#94a3b8] hover:text-white hover:bg-[#0f172a] h-10 text-xs uppercase tracking-wider font-bold"
-                   >
-                      <RotateCw className="w-3 h-3 mr-2" />
-                      Check Again
-                   </Button>
-                </div>
-                
-              </div>
-            </CardContent>
-          </Card>
+      <div className="min-h-screen flex items-center justify-center p-4 bg-[#0b0f13]">
+        <div className="max-w-md w-full text-center space-y-6">
+          <div className="relative">
+            <div className="bg-[#ef4444]/10 p-6 rounded-full border-2 border-[#ef4444]/30 inline-flex mx-auto">
+              <Hourglass className="w-12 h-12 text-[#ef4444] animate-[spin_3s_linear_infinite]" />
+            </div>
+          </div>
           
-          <div className="text-center mt-6 text-[#64748b] text-[10px] uppercase font-bold tracking-widest opacity-50">
-             The market will open shortly
+          <div>
+            <h3 className="text-xl font-bold text-white uppercase tracking-wider mb-2">Game in Progress</h3>
+            <p className="text-[#94a3b8] text-sm">
+              A trading round is currently active
+            </p>
+            <p className="text-[#64748b] text-xs mt-2">
+              Access is temporarily locked until the round completes
+            </p>
+          </div>
+
+          <div className="mt-8 bg-[#1e293b] rounded-lg border border-[#334155] p-6">
+            <Button
+              onClick={() => checkGameStatus()}
+              variant="outline"
+              className="w-full border-[#334155] text-[#94a3b8] hover:text-white hover:bg-[#0f172a] h-10 text-xs uppercase tracking-wider font-bold"
+            >
+              <RotateCw className="w-3 h-3 mr-2" />
+              Check Status
+            </Button>
           </div>
         </div>
       </div>
@@ -164,7 +147,7 @@ export const NameInput: React.FC<NameInputProps> = ({ onSubmit }) => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-[#0f172a]">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-[#0b0f13]">
       <div className="max-w-md w-full">
          <div className="text-center mb-8">
             <div className="flex justify-center mb-4">
@@ -172,15 +155,15 @@ export const NameInput: React.FC<NameInputProps> = ({ onSubmit }) => {
                  <TrendingUp className="w-12 h-12 text-[#f59e0b]" />
               </div>
             </div>
-            <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">FOREX TRADING</h1>
-            <p className="text-[#94a3b8]">Enter the market and start trading</p>
+            <h1 className="text-xl font-bold text-white mb-2 uppercase tracking-wider">Forex Trading</h1>
+            <p className="text-[#94a3b8] text-sm">Enter the market and start trading</p>
          </div>
 
         <Card className="bg-[#1e293b] border-[#334155] shadow-2xl">
           <CardContent className="pt-6">
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
-                <label htmlFor="name" className="text-xs font-bold text-[#94a3b8] uppercase tracking-wider block">
+                <label htmlFor="name" className="text-xs font-bold text-[#94a3b8] uppercase tracking-widest block">
                   Trader Name
                 </label>
                 <div className="relative">
@@ -192,8 +175,8 @@ export const NameInput: React.FC<NameInputProps> = ({ onSubmit }) => {
                      id="name"
                      value={name}
                      onChange={(e) => setName(e.target.value)}
-                     placeholder="ENTER YOUR NAME"
-                     className="bg-[#0b0f13] border-[#334155] text-white pl-10 h-12 font-bold placeholder:text-[#334155] focus-visible:ring-1 focus-visible:ring-[#f59e0b] focus-visible:border-[#f59e0b]"
+                     placeholder="Enter your name"
+                     className="bg-[#0b0f13] border-[#334155] text-white pl-10 h-12 placeholder:text-[#334155] focus-visible:ring-1 focus-visible:ring-[#f59e0b] focus-visible:border-[#f59e0b]"
                      required
                      autoFocus
                      autoComplete="off"
@@ -203,9 +186,9 @@ export const NameInput: React.FC<NameInputProps> = ({ onSubmit }) => {
               
               <Button
                 type="submit"
-                className="w-full h-12 bg-[#f59e0b] hover:bg-[#d97706] text-black font-bold text-lg rounded-md transition-all shadow-lg shadow-[#f59e0b]/20"
+                className="w-full h-12 bg-[#f59e0b] hover:bg-[#d97706] text-black font-bold text-sm uppercase tracking-wider rounded-md transition-all shadow-lg shadow-[#f59e0b]/20"
               >
-                START TRADING
+                Start Trading
               </Button>
             </form>
             

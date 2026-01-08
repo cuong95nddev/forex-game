@@ -66,40 +66,40 @@ export default function HomePage() {
   // Show waiting screen if admin is offline
   if (!isAdminOnline) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-        <div className="text-center p-8 max-w-md">
-          <div className="mb-6">
-            <div className="relative inline-block">
-              <div className="animate-pulse rounded-full h-24 w-24 bg-yellow-500/20 mx-auto mb-4 flex items-center justify-center">
-                <svg className="w-12 h-12 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div className="absolute top-0 right-0 h-3 w-3 bg-red-500 rounded-full animate-ping"></div>
-              <div className="absolute top-0 right-0 h-3 w-3 bg-red-500 rounded-full"></div>
-            </div>
+      <div className="min-h-screen flex items-center justify-center bg-[#0b0f13] p-6">
+        <div className="text-center space-y-6 max-w-md w-full">
+          <div className="relative">
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-[#ef4444]/20 border-t-[#ef4444] mx-auto"></div>
+            <svg className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-6 h-6 text-[#ef4444]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
           </div>
           
-          <h1 className="text-2xl font-bold text-white mb-3">
-            Waiting for Server
-          </h1>
-          <p className="text-slate-400 mb-6">
-            The admin server is not online yet. Please wait a moment...
-          </p>
+          <div>
+            <h1 className="text-xl font-bold text-white uppercase tracking-wider mb-2">
+              Waiting for Server
+            </h1>
+            <p className="text-[#94a3b8] text-sm">
+              The admin server is not online yet
+            </p>
+            <p className="text-[#64748b] text-xs mt-2">
+              Please wait a moment or refresh the page
+            </p>
+          </div>
           
-          <div className="flex gap-3 justify-center">
+          <div className="mt-8 bg-[#1e293b] rounded-lg border border-[#334155] p-6">
             <button
               onClick={() => window.location.reload()}
-              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              className="w-full px-6 py-2 bg-[#ef4444] hover:bg-[#dc2626] text-white rounded-lg transition-colors text-xs uppercase tracking-wider font-bold"
             >
               Refresh Page
             </button>
           </div>
-          
-          <div className="mt-6 flex items-center justify-center gap-2 text-slate-500">
-            <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-            <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-            <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+
+          <div className="flex justify-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-[#ef4444] animate-bounce" style={{ animationDelay: '0ms' }}></div>
+            <div className="h-2 w-2 rounded-full bg-[#ef4444] animate-bounce" style={{ animationDelay: '150ms' }}></div>
+            <div className="h-2 w-2 rounded-full bg-[#ef4444] animate-bounce" style={{ animationDelay: '300ms' }}></div>
           </div>
         </div>
       </div>
