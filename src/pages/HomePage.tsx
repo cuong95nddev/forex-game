@@ -5,7 +5,7 @@ import { useStore } from '../store/useStore'
 import { toast } from 'sonner'
 
 export default function HomePage() {
-  const { user, loading, loadUser, initializeUser, subscribeToGoldPrice, subscribeToBroadcast, subscribeToRounds, subscribeToUsers, subscribeToAdminPresence, updateUserPresence, isAdminOnline, loadOnlineUsers, subscribeToSkillUsage } = useStore()
+  const { user, loading, loadUser, initializeUser, subscribeToGoldPrice, subscribeToBroadcast, subscribeToRounds, subscribeToUsers, subscribeToAdminPresence, updateUserPresence, isAdminOnline, loadOnlineUsers, subscribeToSkillUsage, subscribeToActiveEffects } = useStore()
 
   useEffect(() => {
     console.log('HomePage mounted, loading data...')
@@ -34,6 +34,7 @@ export default function HomePage() {
       console.log('User loaded, subscribing to user changes and skills...')
       subscribeToUsers()
       subscribeToSkillUsage()
+      subscribeToActiveEffects()
       updateUserPresence()
     }
   }, [user])

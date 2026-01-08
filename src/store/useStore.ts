@@ -47,6 +47,14 @@ interface UserSkill {
   skill?: Skill
 }
 
+interface ActiveSkillEffect {
+  id: string
+  user_id: string
+  skill_type: string
+  effect_data: Record<string, any>
+  created_at: string
+}
+
 interface AppState {
   user: User | null
   goldPrice: GoldPrice | null
@@ -69,6 +77,7 @@ interface AppState {
   maxRound: number | null
   userSkills: UserSkill[]
   skillNotification: { message: string; amount: number } | null
+  activeSkillEffects: ActiveSkillEffect[]
   setLastWinAmount: (amount: number | null) => void
   lastLossAmount: number | null
   setLastLossAmount: (amount: number | null) => void
@@ -88,8 +97,10 @@ interface AppState {
   loadOnlineUsers: () => Promise<void>
   loadAllUsers: () => Promise<void>
   loadUserSkills: () => Promise<void>
+  loadActiveSkillEffects: () => Promise<void>
   useSkill: (skillId: string, targetUserId: string, currentRound: number) => Promise<boolean>
   subscribeToSkillUsage: () => void
+  subscribeToActiveEffects: () => void
 }
 
 let broadcastChannel: any = null
@@ -126,6 +137,7 @@ export const useStore = create<AppState>((set, get) => ({
   maxRound: null,
   userSkills: [],
   skillNotification: null,
+  activeSkillEffects: [],
 
   setLastWinAmount: (amount) => set({ lastWinAmount: amount }),
   setLastLossAmount: (amount) => set({ lastLossAmount: amount }),
@@ -1049,18 +1061,43 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   useSkill: async (_skillId: string, targetUserId: string, currentRound: number) => {
-    const { user, loadUser } = get()
+    const { user, loadUser, loadUserSkills, loadActiveSkillEffects } = get()
     if (!user) {
       toast.error('User not found')
       return false
     }
 
     try {
-      const { data, error } = await supabase.rpc('use_steal_money_skill', {
-        p_user_id: user.id,
-        p_target_user_id: targetUserId,
-        p_current_round: currentRound,
-      })
+      // Get the skill to determine its type
+      const skill = get().userSkills.find(s => s.skill_id === _skillId)
+      if (!skill?.skill) {
+        toast.error('Skill not found')
+        return false
+      }
+
+      let data: any
+      let error: any
+
+      // Call the appropriate RPC function based on skill type
+      if (skill.skill.skill_type === 'steal') {
+        const result = await supabase.rpc('use_steal_money_skill', {
+          p_user_id: user.id,
+          p_target_user_id: targetUserId,
+          p_current_round: currentRound,
+        })
+        data = result.data
+        error = result.error
+      } else if (skill.skill.skill_type === 'double') {
+        const result = await supabase.rpc('use_double_skill', {
+          p_user_id: user.id,
+          p_current_round: currentRound,
+        })
+        data = result.data
+        error = result.error
+      } else {
+        toast.error('Unknown skill type')
+        return false
+      }
 
       if (error) {
         console.error('Error using skill:', error)
@@ -1074,11 +1111,17 @@ export const useStore = create<AppState>((set, get) => ({
       }
 
       // Success!
-      const amount = data.amount
-      toast.success(`💰 Successfully stole $${amount.toLocaleString()} from target!`)
+      if (skill.skill.skill_type === 'steal') {
+        const amount = data.amount
+        toast.success(`💰 Successfully stole $${amount.toLocaleString()} from target!`)
+      } else if (skill.skill.skill_type === 'double') {
+        toast.success(`✨ ${data.message || 'Double profit activated!'}`)
+      }
       
-      // Reload user to get updated balance
+      // Reload user and skills to get updated balance and cooldowns
       await loadUser()
+      await loadUserSkills()
+      await loadActiveSkillEffects()
       
       return true
     } catch (error: any) {
@@ -1141,6 +1184,59 @@ export const useStore = create<AppState>((set, get) => ({
     return () => {
       console.log('Unsubscribing from skill usage')
       skillChannel.unsubscribe()
+    }
+  },
+
+  loadActiveSkillEffects: async () => {
+    const { user } = get()
+    if (!user) return
+
+    try {
+      const { data, error } = await supabase
+        .from('active_skill_effects')
+        .select('*')
+        .eq('user_id', user.id)
+
+      if (error) {
+        console.error('Error loading active skill effects:', error)
+        return
+      }
+
+      set({ activeSkillEffects: data || [] })
+    } catch (error) {
+      console.error('Error loading active skill effects:', error)
+    }
+  },
+
+  subscribeToActiveEffects: () => {
+    const { user, loadActiveSkillEffects } = get()
+    if (!user) return
+
+    console.log('Setting up active effects subscription for user:', user.id)
+
+    // Subscribe to active skill effects changes
+    const effectsChannel = supabase
+      .channel('active-effects')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'active_skill_effects',
+          filter: `user_id=eq.${user.id}`
+        },
+        async () => {
+          console.log('Active effects changed, reloading...')
+          await loadActiveSkillEffects()
+        }
+      )
+      .subscribe((status) => {
+        console.log('Active effects subscription status:', status)
+      })
+
+    return () => {
+      console.log('Unsubscribing from active effects')
+      effectsChannel.unsubscribe()
     }
   },
 }))

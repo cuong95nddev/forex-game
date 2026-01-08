@@ -36,7 +36,7 @@ interface UserSkill {
 }
 
 export default function SkillsPanel() {
-  const { user, allUsers, currentRound, useSkill, loadUserSkills, userSkills } = useStore()
+  const { user, allUsers, currentRound, useSkill, loadUserSkills, userSkills, activeSkillEffects, loadActiveSkillEffects } = useStore()
   const [selectedSkill, setSelectedSkill] = useState<UserSkill | null>(null)
   const [showTargetDialog, setShowTargetDialog] = useState(false)
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null)
@@ -44,8 +44,9 @@ export default function SkillsPanel() {
   useEffect(() => {
     if (user) {
       loadUserSkills()
+      loadActiveSkillEffects()
     }
-  }, [user, loadUserSkills])
+  }, [user, loadUserSkills, loadActiveSkillEffects])
 
   const handleSkillClick = (skill: UserSkill) => {
     if (!skill.is_active) {
@@ -63,7 +64,26 @@ export default function SkillsPanel() {
     if (skill.skill?.skill_type === 'steal') {
       setSelectedSkill(skill)
       setShowTargetDialog(true)
+    } 
+    // For double skill, use directly
+    else if (skill.skill?.skill_type === 'double') {
+      handleUseDoubleSkill(skill)
     }
+  }
+
+  const handleUseDoubleSkill = async (skill: UserSkill) => {
+    if (!currentRound) {
+      toast.error('No active round')
+      return
+    }
+
+    // Check if already active
+    if (activeSkillEffects.some(e => e.skill_type === 'double')) {
+      toast.error('Double profit is already active!')
+      return
+    }
+
+    await useSkill(skill.skill_id, '', currentRound.round_number)
   }
 
   const handleUseSkill = async () => {
@@ -84,6 +104,7 @@ export default function SkillsPanel() {
       setSelectedSkill(null)
       setSelectedTarget(null)
       loadUserSkills() // Refresh skills to update cooldown
+      loadActiveSkillEffects() // Refresh active effects
     }
   }
 
@@ -129,6 +150,7 @@ export default function SkillsPanel() {
           {userSkills.map((userSkill) => {
             const cooldownRemaining = getCooldownRemaining(userSkill)
             const isOnCooldown = cooldownRemaining > 0
+            const isDoubleActive = userSkill.skill?.skill_type === 'double' && activeSkillEffects.some(e => e.skill_type === 'double')
             
             return (
               <Card
@@ -136,20 +158,35 @@ export default function SkillsPanel() {
                 className={`relative overflow-hidden border transition-all cursor-pointer ${
                   isOnCooldown
                     ? 'bg-[#1e293b]/50 border-[#334155] opacity-60 cursor-not-allowed'
+                    : isDoubleActive
+                    ? 'bg-gradient-to-br from-[#1e293b] to-[#2d691b] border-[#10b981] animate-pulse'
                     : 'bg-gradient-to-br from-[#1e293b] to-[#2d1b69] border-[#a855f7]/30 hover:border-[#a855f7] hover:shadow-lg hover:shadow-[#a855f7]/20'
                 }`}
-                onClick={() => !isOnCooldown && handleSkillClick(userSkill)}
+                onClick={() => !isOnCooldown && !isDoubleActive && handleSkillClick(userSkill)}
               >
                 <div className="p-4">
                   {/* Skill Icon */}
                   <div className="flex items-start justify-between mb-3">
-                    <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-[#a855f7] to-[#7c3aed] flex items-center justify-center">
-                      <Target className="h-5 w-5 text-white" />
+                    <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
+                      isDoubleActive 
+                        ? 'bg-gradient-to-br from-[#10b981] to-[#059669]'
+                        : 'bg-gradient-to-br from-[#a855f7] to-[#7c3aed]'
+                    }`}>
+                      {userSkill.skill?.skill_type === 'double' ? (
+                        <Sparkles className="h-5 w-5 text-white" />
+                      ) : (
+                        <Target className="h-5 w-5 text-white" />
+                      )}
                     </div>
                     {isOnCooldown && (
                       <Badge className="bg-[#334155] text-[#94a3b8] text-xs border-0">
                         <Clock className="h-3 w-3 mr-1" />
                         {cooldownRemaining}R
+                      </Badge>
+                    )}
+                    {isDoubleActive && (
+                      <Badge className="bg-[#10b981] text-white text-xs border-0 animate-pulse">
+                        ACTIVE
                       </Badge>
                     )}
                   </div>
