@@ -986,13 +986,13 @@ export default function AdminPanel() {
   }
 
   return (
-    <>
+    <div className="flex h-screen bg-[#0b0f13] text-white font-sans overflow-hidden select-none">
       {/* Start New Game Dialog */}
       <Dialog open={showStartDialog} onOpenChange={setShowStartDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl bg-[#0f172a] border-[#1e293b] text-white">
           <DialogHeader>
-            <DialogTitle>Start New Game Session</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-white">Start New Game Session</DialogTitle>
+            <DialogDescription className="text-[#94a3b8]">
               Configure your game settings. This will reset all game data and start from Round 1.
             </DialogDescription>
           </DialogHeader>
@@ -1000,17 +1000,19 @@ export default function AdminPanel() {
           <div className="grid gap-6 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Round Duration (seconds)</label>
+                <label className="text-xs font-bold uppercase tracking-wider text-[#94a3b8]">Round Duration (s)</label>
                 <Input 
                   type="number" 
+                  className="bg-[#1e293b] border-[#334155] text-white font-mono"
                   value={newGameConfig.roundDuration} 
                   onChange={(e) => setNewGameConfig({...newGameConfig, roundDuration: parseInt(e.target.value) || 15})}
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Price Update Interval (seconds)</label>
+                <label className="text-xs font-bold uppercase tracking-wider text-[#94a3b8]">Price Update (s)</label>
                 <Input 
                   type="number" 
+                  className="bg-[#1e293b] border-[#334155] text-white font-mono"
                   value={newGameConfig.priceUpdateInterval} 
                   onChange={(e) => setNewGameConfig({...newGameConfig, priceUpdateInterval: parseInt(e.target.value) || 1})}
                 />
@@ -1019,18 +1021,19 @@ export default function AdminPanel() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Win Rate (%)</label>
+                <label className="text-xs font-bold uppercase tracking-wider text-[#94a3b8]">Win Rate (%)</label>
                 <Input 
                   type="number" 
+                  className="bg-[#1e293b] border-[#334155] text-white font-mono"
                   value={newGameConfig.winRate} 
                   onChange={(e) => setNewGameConfig({...newGameConfig, winRate: parseInt(e.target.value) || 95})}
                 />
-                <p className="text-xs text-muted-foreground">Winners get bet × (1 + rate/100)</p>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Default Balance ($)</label>
+                <label className="text-xs font-bold uppercase tracking-wider text-[#94a3b8]">Default Balance ($)</label>
                 <Input 
                   type="number" 
+                  className="bg-[#1e293b] border-[#334155] text-white font-mono"
                   value={newGameConfig.defaultUserBalance} 
                   onChange={(e) => setNewGameConfig({...newGameConfig, defaultUserBalance: parseInt(e.target.value) || 10000})}
                 />
@@ -1039,47 +1042,50 @@ export default function AdminPanel() {
 
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Min Bet ($)</label>
+                <label className="text-xs font-bold uppercase tracking-wider text-[#94a3b8]">Min Bet ($)</label>
                 <Input 
                   type="number" 
+                  className="bg-[#1e293b] border-[#334155] text-white font-mono"
                   value={newGameConfig.minBetAmount} 
                   onChange={(e) => setNewGameConfig({...newGameConfig, minBetAmount: parseInt(e.target.value) || 10})}
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Max Bet ($)</label>
+                <label className="text-xs font-bold uppercase tracking-wider text-[#94a3b8]">Max Bet ($)</label>
                 <Input 
                   type="number" 
+                  className="bg-[#1e293b] border-[#334155] text-white font-mono"
                   value={newGameConfig.maxBetAmount} 
                   onChange={(e) => setNewGameConfig({...newGameConfig, maxBetAmount: parseInt(e.target.value) || 50000})}
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">No Bet Penalty ($)</label>
+                <label className="text-xs font-bold uppercase tracking-wider text-[#94a3b8]">Penalty ($)</label>
                 <Input 
                   type="number" 
+                  className="bg-[#1e293b] border-[#334155] text-white font-mono"
                   value={newGameConfig.noBetPenalty} 
                   onChange={(e) => setNewGameConfig({...newGameConfig, noBetPenalty: parseInt(e.target.value) || 0})}
                 />
               </div>
             </div>
 
-            <Alert variant="destructive" className="mt-2">
+            <Alert className="mt-2 bg-[#ef4444]/10 border-[#ef4444]/20 text-[#ef4444]">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                <strong>Warning:</strong> Starting a new game will reset all user balances and delete all bets, rounds, and price history. Users will remain registered.
+                Starting a new game will reset all user balances and delete all bets, rounds, and price history.
               </AlertDescription>
             </Alert>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowStartDialog(false)} disabled={isSaving}>
+            <Button variant="outline" className="border-[#334155] text-[#94a3b8] hover:bg-[#1e293b] hover:text-white" onClick={() => setShowStartDialog(false)} disabled={isSaving}>
               Cancel
             </Button>
             <Button 
               onClick={startNewGameSession} 
               disabled={isSaving}
-              className="bg-gradient-to-r from-primary to-emerald-600 hover:from-primary/90 hover:to-emerald-600/90"
+              className="bg-[#10b981] hover:bg-[#059669] text-white font-bold"
             >
               {isSaving ? 'Starting...' : 'Start New Game'}
             </Button>
@@ -1087,439 +1093,375 @@ export default function AdminPanel() {
         </DialogContent>
       </Dialog>
 
-    <div className="flex h-screen bg-muted/40 text-foreground">
       {/* Sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-10 hidden w-64 flex-col border-r bg-background sm:flex">
-        <div className="flex h-14 items-center border-b px-6 lg:h-[60px]">
-          <a className="flex items-center gap-2 font-semibold" href="#">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#f59e0b] via-[#d97706] to-[#b45309] flex items-center justify-center text-white shadow-lg glow-gold">
-              <Settings size={20} />
+      <aside className="w-[240px] bg-[#0f172a] border-r border-[#1e293b] flex flex-col hidden sm:flex z-50">
+        <div className="h-14 flex items-center px-6 border-b border-[#1e293b]">
+          <div className="flex items-center gap-2 font-bold text-white">
+            <div className="w-8 h-8 rounded bg-[#f59e0b] flex items-center justify-center text-black shadow-lg shadow-[#f59e0b]/20">
+              <Settings size={18} />
             </div>
-            <span className="">Admin Panel</span>
-          </a>
+            <span className="tracking-wider text-sm">ADMIN PANEL</span>
+          </div>
         </div>
-        <nav className="grid gap-1 px-2 py-4 text-sm font-medium">
-          <Button 
-            variant={activeView === 'dashboard' ? 'secondary' : 'ghost'} 
-            className="justify-start gap-2"
-            onClick={() => setActiveView('dashboard')}
-          >
-            <LayoutDashboard className="h-4 w-4" />
-            Dashboard
-          </Button>
-          <Button 
-            variant={activeView === 'users' ? 'secondary' : 'ghost'} 
-            className="justify-start gap-2"
-            onClick={() => setActiveView('users')}
-          >
-            <Users className="h-4 w-4" />
-            Users
-          </Button>
-          <Button 
-            variant={activeView === 'settings' ? 'secondary' : 'ghost'} 
-            className="justify-start gap-2"
-            onClick={() => setActiveView('settings')}
-          >
-            <Settings className="h-4 w-4" />
-            Settings
-          </Button>
-          <Button 
-            variant={activeView === 'data' ? 'secondary' : 'ghost'} 
-            className="justify-start gap-2"
-            onClick={() => setActiveView('data')}
-          >
-            <Database className="h-4 w-4" />
-            Data
-          </Button>
+        
+        <nav className="flex-1 p-4 space-y-1">
+          {[
+            { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+            { id: 'users', icon: Users, label: 'Users' },
+            { id: 'settings', icon: Settings, label: 'Settings' },
+            { id: 'data', icon: Database, label: 'Data' }
+          ].map((item) => (
+            <Button 
+              key={item.id}
+              variant="ghost" 
+              className={`w-full justify-start gap-3 h-10 ${activeView === item.id ? 'bg-[#1e293b] text-[#f59e0b] border-r-2 border-[#f59e0b]' : 'text-[#94a3b8] hover:bg-[#1e293b]/50 hover:text-white'}`}
+              onClick={() => setActiveView(item.id as any)}
+            >
+              <item.icon size={18} />
+              <span className="font-medium text-xs uppercase tracking-wider">{item.label}</span>
+            </Button>
+          ))}
         </nav>
       </aside>
 
       {/* Main Content */}
-      <div className="flex flex-col sm:gap-4 sm:py-4 sm:pl-64 w-full h-full">
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
-          <div className="flex items-center gap-4">
-             {/* Mobile menu trigger could go here */}
-             <h1 className="text-xl font-semibold capitalize">{activeView}</h1>
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="h-14 bg-[#0f172a] border-b border-[#1e293b] flex items-center px-6 justify-between shrink-0">
+          <div className="flex items-center gap-2">
+            <h1 className="font-bold text-sm uppercase tracking-wider text-white">{activeView}</h1>
           </div>
-          <div className="ml-auto flex items-center gap-2">
+          
+          <div className="flex items-center gap-3">
             {isWaitingForConfig && (
-              <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/20 gap-1.5">
-                <Clock size={14} />
-                Waiting for Config
+              <Badge variant="outline" className="bg-[#f59e0b]/10 text-[#f59e0b] border-[#f59e0b]/20 gap-1.5 animate-pulse">
+                <Clock size={12} />
+                WAITING FOR CONFIG
               </Badge>
             )}
             {isGameRunning && (
-              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 gap-1.5 hidden sm:flex">
+              <Badge variant="outline" className="bg-[#10b981]/10 text-[#10b981] border-[#10b981]/20 gap-1.5 hidden sm:flex">
                 <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#10b981] opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[#10b981]"></span>
                 </span>
-                Broadcasting Live
+                BROADCASTING LIVE
               </Badge>
             )}
+            
+            <div className="h-6 w-[1px] bg-[#1e293b] mx-2"></div>
+
             <Button
               onClick={prepareForNewGame}
               size="sm"
-              className="bg-gradient-to-r from-primary to-emerald-600 hover:from-primary/90 hover:to-emerald-600/90"
+              className="bg-[#f59e0b] hover:bg-[#d97706] text-black font-bold text-xs"
             >
-              <Play size={16} className="mr-2" />
-              Start New Game
+              <Play size={14} className="mr-2" />
+              NEW GAME
             </Button>
+            
             {currentRound && (
               <>
-                {isGameRunning ? (
-                  <Button
-                    onClick={() => setIsGameRunning(false)}
-                    size="sm"
-                    variant="outline"
-                  >
-                    <Pause size={16} className="mr-2" />
-                    Pause Game
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={() => setIsGameRunning(true)}
-                    size="sm"
-                    variant="outline"
-                  >
-                    <Play size={16} className="mr-2" />
-                    Resume Game
-                  </Button>
-                )}
+                <Button
+                  onClick={() => setIsGameRunning(!isGameRunning)}
+                  size="sm"
+                  variant="outline"
+                  className="border-[#334155] text-[#94a3b8] hover:text-white hover:bg-[#1e293b]"
+                >
+                  {isGameRunning ? <Pause size={14} className="mr-2" /> : <Play size={14} className="mr-2" />}
+                  {isGameRunning ? 'PAUSE' : 'RESUME'}
+                </Button>
                 <Button
                   onClick={() => setShowDeleteDialog(true)}
                   size="sm"
                   variant="outline"
-                  className="text-destructive hover:bg-destructive/10"
+                  className="border-[#ef4444]/30 text-[#ef4444] hover:bg-[#ef4444]/10 hover:text-[#ef4444]"
                 >
-                  <Trash2 size={16} className="mr-2" />
-                  Delete Game
+                  <Trash2 size={14} className="mr-2" />
+                  DELETE
                 </Button>
               </>
             )}
           </div>
         </header>
         
-        <main className="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8 overflow-auto">
+        <ScrollArea className="flex-1 bg-[#0b0f13]">
+          <div className="p-6 space-y-6">
           
           {/* Dashboard View */}
           {activeView === 'dashboard' && (
             <div className="space-y-6">
               {/* Warning Banner */}
-              <Alert className="bg-amber-500/10 border-amber-500/50 text-amber-700 dark:text-amber-400">
-                <AlertTriangle className="h-4 w-4 stroke-amber-600 dark:stroke-amber-400" />
-                 <AlertDescription className="ml-2 font-medium">
-                  Keep this page open to maintain game broadcast. Closing it will stop the game.
-                </AlertDescription>
-              </Alert>
+              <div className="bg-[#f59e0b]/10 border border-[#f59e0b]/20 p-4 rounded-lg flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-[#f59e0b] shrink-0" />
+                 <div>
+                  <h4 className="text-[#f59e0b] font-bold text-sm">BROADCAST ACTIVE</h4>
+                  <p className="text-[#94a3b8] text-xs mt-1">
+                    Keep this page open to maintain game broadcast. Closing it will stop the game.
+                  </p>
+                </div>
+              </div>
 
               {/* No Active Game State */}
               {!currentRound && !isGameRunning && !isWaitingForConfig && (
-                <Card className="bg-muted/30 border-dashed">
-                  <CardContent className="flex flex-col items-center justify-center py-12">
-                    <div className="rounded-full bg-muted p-4 mb-4">
-                      <Clock className="h-8 w-8 text-muted-foreground" />
+                <div className="border border-dashed border-[#1e293b] rounded-xl bg-[#0f172a]/50 p-12 flex flex-col items-center justify-center text-center">
+                    <div className="rounded-full bg-[#1e293b] p-4 mb-4">
+                      <Clock className="h-8 w-8 text-[#94a3b8]" />
                     </div>
-                    <h3 className="text-xl font-semibold mb-2">No Active Game</h3>
-                    <p className="text-muted-foreground text-center mb-4">
-                      Click "Start New Game" to begin a new game session
+                    <h3 className="text-xl font-semibold mb-2 text-white">No Active Game</h3>
+                    <p className="text-[#94a3b8] mb-6 max-w-sm text-sm">
+                      Start a new game session to begin trading rounds and broadcasts.
                     </p>
-                  </CardContent>
-                </Card>
+                    <Button onClick={prepareForNewGame} className="bg-[#10b981] hover:bg-[#059669] text-white">
+                      Initialize Game System
+                    </Button>
+                </div>
               )}
 
-              {/* Stats Grid - Only show when there's an active game */}
+              {/* Stats Grid */}
               {currentRound && (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Rounds</CardTitle>
-                    <RefreshCw className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{stats.totalRounds}</div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Active Players</CardTitle>
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{stats.activePlayers}</div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Bets</CardTitle>
-                    <Database className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{stats.totalBets}</div>
-                  </CardContent>
-                </Card>
-                <Card>
-                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Current Price</CardTitle>
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">${currentPrice.toFixed(2)}</div>
-                    <p className="text-xs text-muted-foreground">
-                      {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}
-                    </p>
-                  </CardContent>
-                </Card>
+                {[
+                  { label: 'Total Rounds', value: stats.totalRounds, icon: RefreshCw },
+                  { label: 'Active Players', value: stats.activePlayers, icon: Users },
+                  { label: 'Total Bets', value: stats.totalBets, icon: Database },
+                  { label: 'Current Price', value: `$${currentPrice.toFixed(2)}`, sub: `${priceChange >= 0 ? '+' : ''}${priceChange.toFixed(2)}`, icon: TrendingUp, color: priceChange >= 0 ? 'text-[#10b981]' : 'text-[#ef4444]' },
+                ].map((stat, i) => (
+                  <div key={i} className="bg-[#0f172a] border border-[#1e293b] p-4 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                       <span className="text-[#94a3b8] text-[10px] uppercase font-bold tracking-wider">{stat.label}</span>
+                       <stat.icon size={14} className="text-[#94a3b8]" />
+                    </div>
+                    <div className={`text-2xl font-mono font-bold text-white`}>
+                       {stat.value}
+                    </div>
+                    {stat.sub && (
+                       <div className={`text-xs font-bold mt-1 ${stat.color}`}>{stat.sub}</div>
+                    )}
+                  </div>
+                ))}
               </div>
               )}
 
                {/* Current Round Card */}
               {currentRound && (
-                <Card className="bg-gradient-to-br from-primary/5 via-transparent to-transparent border-primary/20">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <RefreshCw className="h-5 w-5 animate-spin text-primary" />
-                         Current Round #{currentRound.round_number}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="bg-background/50 p-4 rounded-xl border">
-                         <div className="text-sm font-medium text-muted-foreground mb-1">Status</div>
-                         <div className="text-xl font-bold uppercase text-primary">Active</div>
+                <div className="bg-[#0f172a] border border-[#1e293b] rounded-lg overflow-hidden">
+                  <div className="border-b border-[#1e293b] bg-[#1e293b]/30 px-6 py-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                       <RefreshCw className="h-5 w-5 animate-spin text-[#f59e0b]" />
+                       <h3 className="font-bold text-white">Round #{currentRound.round_number}</h3>
+                    </div>
+                    <Badge variant="outline" className="border-[#10b981] text-[#10b981] bg-[#10b981]/10">ACTIVE</Badge>
+                  </div>
+                  <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="bg-[#0b0f13] p-4 rounded-lg border border-[#1e293b]">
+                         <div className="text-[#94a3b8] text-[10px] uppercase font-bold tracking-wider mb-2">Start Price</div>
+                         <div className="text-2xl font-mono font-bold text-white">${currentRound.start_price.toFixed(2)}</div>
                       </div>
-                      <div className="bg-background/50 p-4 rounded-xl border">
-                        <div className="text-sm font-medium text-muted-foreground mb-1">Start Price</div>
-                         <div className="text-xl font-bold">${currentRound.start_price.toFixed(2)}</div>
+                      <div className="bg-[#0b0f13] p-4 rounded-lg border border-[#1e293b]">
+                         <div className="text-[#94a3b8] text-[10px] uppercase font-bold tracking-wider mb-2">Current Price</div>
+                         <div className={`text-2xl font-mono font-bold ${currentPrice >= currentRound.start_price ? 'text-[#10b981]' : 'text-[#ef4444]'}`}>
+                            ${currentPrice.toFixed(2)}
+                         </div>
                       </div>
-                      <div className="bg-background/50 p-4 rounded-xl border">
-                        <div className="text-sm font-medium text-muted-foreground mb-1">Time Remaining</div>
-                         <div className={`text-xl font-bold ${countdown <= 5 ? 'text-destructive animate-pulse' : ''}`}>
+                      <div className="bg-[#0b0f13] p-4 rounded-lg border border-[#1e293b]">
+                        <div className="text-[#94a3b8] text-[10px] uppercase font-bold tracking-wider mb-2">Time Remaining</div>
+                         <div className={`text-2xl font-mono font-bold flex items-center gap-2 ${countdown <= 5 ? 'text-[#ef4444] animate-pulse' : 'text-[#f59e0b]'}`}>
+                          <Clock size={20} />
                           {countdown}s
                          </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               )}
 
-              {/* Game Status Section */}
+              {/* Auto Mode Config View */}
               {isGameRunning && (
-                <Card className="border-primary/20">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <RefreshCw className="h-5 w-5 animate-spin text-primary" />
-                      Auto Mode Active
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className="bg-muted/30 p-4 rounded-lg">
-                        <div className="text-sm text-muted-foreground mb-1">Price Updates</div>
-                        <div className="font-semibold">Every {priceUpdateInterval}s</div>
-                      </div>
-                      <div className="bg-muted/30 p-4 rounded-lg">
-                        <div className="text-sm text-muted-foreground mb-1">Win Rate</div>
-                        <div className="font-semibold">{winRate*100}%</div>
-                      </div>
-                      <div className="bg-muted/30 p-4 rounded-lg">
-                        <div className="text-sm text-muted-foreground mb-1">Bet Range</div>
-                        <div className="font-semibold">${minBetAmount} - ${maxBetAmount}</div>
-                      </div>
-                      <div className="bg-muted/30 p-4 rounded-lg">
-                        <div className="text-sm text-muted-foreground mb-1">No Bet Penalty</div>
-                        <div className="font-semibold">${noBetPenalty}</div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                <div className="bg-[#0f172a] border border-[#1e293b] rounded-lg p-6">
+                  <h3 className="font-bold text-white mb-4 text-sm uppercase tracking-wider">Configuration</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {[
+                        { label: 'Update Interval', value: `${priceUpdateInterval}s` },
+                        { label: 'Win Rate', value: `${(winRate*100).toFixed(0)}%` },
+                        { label: 'Bet Range', value: `$${minBetAmount} - $${maxBetAmount}` },
+                        { label: 'No Bet Penalty', value: `$${noBetPenalty}` },
+                      ].map((item, i) => (
+                        <div key={i} className="bg-[#1e293b]/50 p-3 rounded border border-[#1e293b]">
+                          <div className="text-[#94a3b8] text-[10px] uppercase font-bold mb-1">{item.label}</div>
+                          <div className="font-mono text-sm text-white">{item.value}</div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
               )}
             </div>
           )}
 
           {/* Users View */}
           {activeView === 'users' && (
-             <Card>
-              <CardHeader>
-                <CardTitle>User Management</CardTitle>
-                <CardDescription>Manage your registered users and their balances.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                 <ScrollArea className="h-[600px] pr-4">
-                   <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>User</TableHead>
-                        <TableHead>Balance</TableHead>
-                        <TableHead>ID / Fingerprint</TableHead>
-                        <TableHead>Joined</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                       {users.map((user) => (
-                        <TableRow key={user.id}>
-                          <TableCell className="font-medium">{user.name}</TableCell>
-                           <TableCell>
-                            {editingUser === user.id ? (
-                              <div className="flex items-center gap-2">
-                                <Input
-                                  type="number"
-                                  value={editBalance}
-                                  onChange={(e) => setEditBalance(parseFloat(e.target.value))}
-                                  className="w-24 h-8"
-                                />
-                                <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600" onClick={() => updateUserBalance(user.id, editBalance)}>
-                                  <TrendingUp className="h-4 w-4" />
-                                </Button>
-                                <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600" onClick={() => setEditingUser(null)}>
-                                  <LogOut className="h-4 w-4 rotate-180" />
+             <div className="bg-[#0f172a] border border-[#1e293b] rounded-lg flex flex-col h-[600px]">
+              <div className="p-4 border-b border-[#1e293b]">
+                <h3 className="font-bold text-white">User Management</h3>
+              </div>
+              <ScrollArea className="flex-1">
+                 <Table>
+                  <TableHeader className="bg-[#1e293b]/50 sticky top-0">
+                    <TableRow className="border-[#1e293b] hover:bg-transparent">
+                      <TableHead className="text-[#94a3b8] text-[10px] uppercase font-bold">User</TableHead>
+                      <TableHead className="text-[#94a3b8] text-[10px] uppercase font-bold">Balance</TableHead>
+                      <TableHead className="text-[#94a3b8] text-[10px] uppercase font-bold">ID / Fingerprint</TableHead>
+                      <TableHead className="text-[#94a3b8] text-[10px] uppercase font-bold">Joined</TableHead>
+                      <TableHead className="text-right text-[#94a3b8] text-[10px] uppercase font-bold">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                     {users.map((user) => (
+                      <TableRow key={user.id} className="border-[#1e293b] hover:bg-[#1e293b]/30">
+                        <TableCell className="font-bold text-white">{user.name}</TableCell>
+                         <TableCell>
+                          {editingUser === user.id ? (
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="number"
+                                value={editBalance}
+                                onChange={(e) => setEditBalance(parseFloat(e.target.value))}
+                                className="w-24 h-8 bg-[#0b0f13] border-[#334155] text-white"
+                              />
+                              <Button size="icon" variant="ghost" className="h-8 w-8 text-[#10b981] hover:bg-[#10b981]/10 hover:text-[#10b981]" onClick={() => updateUserBalance(user.id, editBalance)}>
+                                <TrendingUp className="h-4 w-4" />
+                              </Button>
+                              <Button size="icon" variant="ghost" className="h-8 w-8 text-[#ef4444] hover:bg-[#ef4444]/10 hover:text-[#ef4444]" onClick={() => setEditingUser(null)}>
+                                <LogOut className="h-4 w-4 rotate-180" />
+                              </Button>
+                            </div>
+                          ) : (
+                             <span className="font-mono text-[#f59e0b]">${user.balance.toFixed(2)}</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-[#94a3b8] text-xs font-mono">{user.fingerprint.substring(0, 12)}...</TableCell>
+                        <TableCell className="text-[#94a3b8] text-xs">{new Date(user.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-right">
+                           {editingUser !== user.id && (
+                              <div className="flex justify-end gap-2">
+                                <Button variant="outline" size="sm" className="h-8 text-xs border-[#334155] text-[#94a3b8] hover:text-white" onClick={() => { setEditingUser(user.id); setEditBalance(user.balance); }}>EDIT</Button>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 text-[#ef4444] hover:bg-[#ef4444]/10 hover:text-[#ef4444] p-0" onClick={() => { setUserToDelete(user.id); setShowDeleteUserDialog(true); }}>
+                                   <Trash2 size={14} />
                                 </Button>
                               </div>
-                            ) : (
-                               <span className="font-mono">${user.balance.toFixed(2)}</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground text-xs font-mono">{user.fingerprint.substring(0, 12)}...</TableCell>
-                          <TableCell className="text-muted-foreground text-xs">{new Date(user.created_at).toLocaleDateString()}</TableCell>
-                          <TableCell className="text-right">
-                             {editingUser !== user.id && (
-                                <div className="flex justify-end gap-2">
-                                  <Button variant="outline" size="sm" onClick={() => { setEditingUser(user.id); setEditBalance(user.balance); }}>Edit</Button>
-                                  <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => { setUserToDelete(user.id); setShowDeleteUserDialog(true); }}>Delete</Button>
-                                </div>
-                             )}
-                          </TableCell>
-                        </TableRow>
-                       ))}
-                    </TableBody>
-                   </Table>
-                 </ScrollArea>
-              </CardContent>
-             </Card>
+                           )}
+                        </TableCell>
+                      </TableRow>
+                     ))}
+                  </TableBody>
+                 </Table>
+              </ScrollArea>
+             </div>
           )}
 
           {/* Settings View */}
           {activeView === 'settings' && (
             <div className="max-w-4xl space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Game Configuration</CardTitle>
-                  <CardDescription>Adjust the core mechanics of the game rounds.</CardDescription>
-                </CardHeader>
-                <CardContent className="grid gap-6">
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Round Duration (s)</label>
-                        <Input type="number" value={roundDuration} onChange={(e) => { setRoundDuration(parseInt(e.target.value)||15); setHasUnsavedChanges(true); }} />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Price Update Interval (s)</label>
-                        <Input type="number" value={priceUpdateInterval} onChange={(e) => { setPriceUpdateInterval(parseInt(e.target.value)||1); setHasUnsavedChanges(true); }} />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Win Rate</label>
-                         <Input type="number" value={(winRate * 100).toFixed(0)} onChange={(e) => { setWinRate(parseFloat(e.target.value)/100 || 0.95); setHasUnsavedChanges(true); }} />
-                         <p className="text-xs text-muted-foreground">Payout multiplier (e.g. 95 = 1.95x)</p>
-                      </div>
-                   </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Financial Limits</CardTitle>
-                  <CardDescription>Set limits for betting and balances.</CardDescription>
-                </CardHeader>
-                <CardContent className="grid gap-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                       <div className="space-y-2">
-                          <label className="text-sm font-medium">Default Balance ($)</label>
-                          <Input type="number" value={defaultUserBalance} onChange={(e) => { setDefaultUserBalance(parseFloat(e.target.value)||10000); setHasUnsavedChanges(true); }} />
-                       </div>
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">No Bet Penalty ($)</label>
-                          <Input type="number" value={noBetPenalty} onChange={(e) => { setNoBetPenalty(parseFloat(e.target.value)||0); setHasUnsavedChanges(true); }} />
-                       </div>
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">Min Bet ($)</label>
-                          <Input type="number" value={minBetAmount} onChange={(e) => { setMinBetAmount(parseFloat(e.target.value)||10); setHasUnsavedChanges(true); }} />
-                       </div>
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">Max Bet ($)</label>
-                          <Input type="number" value={maxBetAmount} onChange={(e) => { setMaxBetAmount(parseFloat(e.target.value)||50000); setHasUnsavedChanges(true); }} />
-                       </div>
+              <div className="bg-[#0f172a] border border-[#1e293b] rounded-lg p-6">
+                <h3 className="font-bold text-white mb-1">Game Configuration</h3>
+                <p className="text-sm text-[#94a3b8] mb-6">Adjust the core mechanics of the game rounds.</p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-[#94a3b8]">Round Duration (s)</label>
+                      <Input className="bg-[#1e293b] border-[#334155] text-white" type="number" value={roundDuration} onChange={(e) => { setRoundDuration(parseInt(e.target.value)||15); setHasUnsavedChanges(true); }} />
                     </div>
-                </CardContent>
-                <div className="p-6 border-t bg-muted/20">
-                    <Button onClick={saveSettings} disabled={!hasUnsavedChanges || isSaving} size="lg" className="w-full sm:w-auto">
-                      {isSaving ? 'Saving...' : 'Save Configuration'}
-                    </Button>
-                    <p className="text-xs text-muted-foreground mt-2">Settings will apply to new rounds. To reset and start fresh, use "Start New Game".</p>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-[#94a3b8]">Price Update (s)</label>
+                      <Input className="bg-[#1e293b] border-[#334155] text-white" type="number" value={priceUpdateInterval} onChange={(e) => { setPriceUpdateInterval(parseInt(e.target.value)||1); setHasUnsavedChanges(true); }} />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-[#94a3b8]">Win Rate (0.95 = 95%)</label>
+                       <Input className="bg-[#1e293b] border-[#334155] text-white" type="number" value={(winRate * 100).toFixed(0)} onChange={(e) => { setWinRate(parseFloat(e.target.value)/100 || 0.95); setHasUnsavedChanges(true); }} />
+                    </div>
                 </div>
-              </Card>
+              </div>
+
+              <div className="bg-[#0f172a] border border-[#1e293b] rounded-lg p-6">
+                <h3 className="font-bold text-white mb-1">Financial Limits</h3>
+                <p className="text-sm text-[#94a3b8] mb-6">Set limits for betting and balances.</p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-[#94a3b8]">Default Balance ($)</label>
+                        <Input className="bg-[#1e293b] border-[#334155] text-white" type="number" value={defaultUserBalance} onChange={(e) => { setDefaultUserBalance(parseFloat(e.target.value)||10000); setHasUnsavedChanges(true); }} />
+                    </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-[#94a3b8]">Penalty ($)</label>
+                        <Input className="bg-[#1e293b] border-[#334155] text-white" type="number" value={noBetPenalty} onChange={(e) => { setNoBetPenalty(parseFloat(e.target.value)||0); setHasUnsavedChanges(true); }} />
+                    </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-[#94a3b8]">Min Bet ($)</label>
+                        <Input className="bg-[#1e293b] border-[#334155] text-white" type="number" value={minBetAmount} onChange={(e) => { setMinBetAmount(parseFloat(e.target.value)||10); setHasUnsavedChanges(true); }} />
+                    </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-[#94a3b8]">Max Bet ($)</label>
+                        <Input className="bg-[#1e293b] border-[#334155] text-white" type="number" value={maxBetAmount} onChange={(e) => { setMaxBetAmount(parseFloat(e.target.value)||50000); setHasUnsavedChanges(true); }} />
+                    </div>
+                </div>
+
+                <div className="mt-6 pt-6 border-t border-[#1e293b]">
+                    <Button onClick={saveSettings} disabled={!hasUnsavedChanges || isSaving} className="w-full sm:w-auto bg-[#10b981] hover:bg-[#059669] text-white font-bold">
+                      {isSaving ? 'Saving...' : 'SAVE CONFIGURATION'}
+                    </Button>
+                </div>
+              </div>
             </div>
           )}
 
           {/* Data View */}
           {activeView === 'data' && (
             <div className="max-w-4xl space-y-6">
-               <Card>
-                 <CardHeader>
-                   <CardTitle>Database Maintenance</CardTitle>
-                   <CardDescription>Clean up old data to keep the system running smoothly.</CardDescription>
-                 </CardHeader>
-                 <CardContent className="grid gap-4">
-                    <div className="flex items-center justify-between p-4 border rounded-lg">
+               <div className="bg-[#0f172a] border border-[#1e293b] rounded-lg p-6">
+                 <h3 className="font-bold text-white mb-4">Database Maintenance</h3>
+                 <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 border border-[#1e293b] rounded-lg bg-[#1e293b]/30">
                       <div>
-                        <div className="font-semibold">Clear Price History</div>
-                        <div className="text-sm text-muted-foreground">Removes all price records except the latest ones.</div>
+                        <div className="font-bold text-white text-sm">Clear Price History</div>
+                        <div className="text-xs text-[#94a3b8]">Removes all price records except the latest ones.</div>
                       </div>
-                       <Button variant="outline" onClick={() => setShowCleanPricesDialog(true)}>Clear</Button>
+                       <Button variant="outline" className="border-[#334155] text-[#94a3b8] hover:text-white" onClick={() => setShowCleanPricesDialog(true)}>Clear</Button>
                     </div>
-                     <div className="flex items-center justify-between p-4 border rounded-lg">
+                     <div className="flex items-center justify-between p-4 border border-[#1e293b] rounded-lg bg-[#1e293b]/30">
                       <div>
-                        <div className="font-semibold">Clear Old Rounds</div>
-                        <div className="text-sm text-muted-foreground">Removes completed rounds older than 24 hours.</div>
+                        <div className="font-bold text-white text-sm">Clear Old Rounds</div>
+                        <div className="text-xs text-[#94a3b8]">Removes completed rounds older than 24 hours.</div>
                       </div>
-                       <Button variant="outline" onClick={() => setShowCleanRoundsDialog(true)}>Clear</Button>
+                       <Button variant="outline" className="border-[#334155] text-[#94a3b8] hover:text-white" onClick={() => setShowCleanRoundsDialog(true)}>Clear</Button>
                     </div>
-                 </CardContent>
-               </Card>
+                 </div>
+               </div>
 
-               <Card className="border-destructive/50">
-                 <CardHeader>
-                   <CardTitle className="text-destructive">Danger Zone</CardTitle>
-                 </CardHeader>
-                 <CardContent>
-                    <div className="space-y-4">
-                       <Alert variant="destructive">
-                         <AlertTriangle className="h-4 w-4" />
-                         <AlertDescription>
-                           This action will wipe ALL data including users, bets, and settings. This cannot be undone.
-                         </AlertDescription>
-                       </Alert>
-                       <Button variant="destructive" onClick={() => setShowResetAllDialog(true)}>Reset Entire System</Button>
+               <div className="bg-[#0f172a] border border-[#ef4444]/30 rounded-lg p-6">
+                 <h3 className="font-bold text-[#ef4444] mb-4">Danger Zone</h3>
+                 <div className="space-y-4">
+                    <div className="bg-[#ef4444]/10 border border-[#ef4444]/20 p-4 rounded-lg flex items-start gap-3 text-[#ef4444] text-sm">
+                      <AlertTriangle className="h-5 w-5 shrink-0" />
+                      <p>This action will wipe ALL data including users, bets, and settings. This cannot be undone.</p>
                     </div>
-                 </CardContent>
-               </Card>
+                    <Button variant="destructive" className="w-full" onClick={() => setShowResetAllDialog(true)}>RESET ENTIRE SYSTEM</Button>
+                 </div>
+               </div>
             </div>
           )}
-
-        </main>
+          </div>
+        </ScrollArea>
       </div>
 
       {/* Delete Game Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent>
+        <DialogContent className="bg-[#0f172a] border-[#1e293b] text-white">
           <DialogHeader>
-            <DialogTitle>Delete Current Game?</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-white">Delete Current Game?</DialogTitle>
+            <DialogDescription className="text-[#94a3b8]">
               This will end the current round and stop the game. Players will return to the waiting screen.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+            <Button variant="outline" className="border-[#334155] text-[#94a3b8] hover:text-white" onClick={() => setShowDeleteDialog(false)}>
               Cancel
             </Button>
             <Button 
@@ -1537,15 +1479,15 @@ export default function AdminPanel() {
 
       {/* Delete User Confirmation Dialog */}
       <Dialog open={showDeleteUserDialog} onOpenChange={setShowDeleteUserDialog}>
-        <DialogContent>
+        <DialogContent className="bg-[#0f172a] border-[#1e293b] text-white">
           <DialogHeader>
-            <DialogTitle>Delete User?</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-white">Delete User?</DialogTitle>
+            <DialogDescription className="text-[#94a3b8]">
               This will permanently delete this user and all their bets. This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteUserDialog(false)}>
+            <Button variant="outline" className="border-[#334155] text-[#94a3b8] hover:text-white" onClick={() => setShowDeleteUserDialog(false)}>
               Cancel
             </Button>
             <Button 
@@ -1566,15 +1508,15 @@ export default function AdminPanel() {
 
       {/* Clean Price History Dialog */}
       <Dialog open={showCleanPricesDialog} onOpenChange={setShowCleanPricesDialog}>
-        <DialogContent>
+        <DialogContent className="bg-[#0f172a] border-[#1e293b] text-white">
           <DialogHeader>
-            <DialogTitle>Clean Price History?</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-white">Clean Price History?</DialogTitle>
+            <DialogDescription className="text-[#94a3b8]">
               This will delete all price history and reset to starting price. This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCleanPricesDialog(false)}>
+            <Button variant="outline" className="border-[#334155] text-[#94a3b8] hover:text-white" onClick={() => setShowCleanPricesDialog(false)}>
               Cancel
             </Button>
             <Button 
@@ -1592,15 +1534,15 @@ export default function AdminPanel() {
 
       {/* Clean Old Rounds Dialog */}
       <Dialog open={showCleanRoundsDialog} onOpenChange={setShowCleanRoundsDialog}>
-        <DialogContent>
+        <DialogContent className="bg-[#0f172a] border-[#1e293b] text-white">
           <DialogHeader>
-            <DialogTitle>Clean Old Rounds?</DialogTitle>
-            <DialogDescription>
-              This will delete all completed rounds older than 24 hours. This action cannot be undone.
+            <DialogTitle className="text-white">Clean Old Rounds?</DialogTitle>
+            <DialogDescription className="text-[#94a3b8]">
+               This will delete all completed rounds older than 24 hours. This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCleanRoundsDialog(false)}>
+            <Button variant="outline" className="border-[#334155] text-[#94a3b8] hover:text-white" onClick={() => setShowCleanRoundsDialog(false)}>
               Cancel
             </Button>
             <Button 
@@ -1618,10 +1560,10 @@ export default function AdminPanel() {
 
       {/* Reset All Data Dialog */}
       <Dialog open={showResetAllDialog} onOpenChange={setShowResetAllDialog}>
-        <DialogContent>
+        <DialogContent className="bg-[#0f172a] border-[#1e293b] text-white">
           <DialogHeader>
-            <DialogTitle>⚠️ DANGER: Reset Entire System?</DialogTitle>
-            <DialogDescription className="space-y-2">
+            <DialogTitle className="text-white text-destructive">⚠️ DANGER: Reset Entire System?</DialogTitle>
+            <DialogDescription className="space-y-2 text-[#94a3b8]">
               <p className="font-bold text-destructive">This will delete ALL data including:</p>
               <ul className="list-disc list-inside text-sm">
                 <li>All users</li>
@@ -1633,7 +1575,7 @@ export default function AdminPanel() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowResetAllDialog(false)}>
+            <Button variant="outline" className="border-[#334155] text-[#94a3b8] hover:text-white" onClick={() => setShowResetAllDialog(false)}>
               Cancel
             </Button>
             <Button 
@@ -1649,7 +1591,6 @@ export default function AdminPanel() {
         </DialogContent>
       </Dialog>
     </div>
-    </>
   )
 }
 

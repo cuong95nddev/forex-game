@@ -195,45 +195,57 @@ export default function TradingInterface() {
           </div>
           
           {/* Online Users List */}
-          <div className="mt-8 bg-[#1e293b] rounded-lg border border-[#334155] p-6">
-            <div className="flex items-center gap-2 mb-4">
+          <div className="mt-8 bg-[#1e293b] rounded-lg border border-[#334155] overflow-hidden">
+            <div className="flex items-center gap-2 p-4 border-b border-[#334155] bg-[#1e293b]/50">
               <Users className="h-5 w-5 text-[#f59e0b]" />
               <h3 className="text-lg font-bold text-white">
-                Players Online ({onlineUsersList.length})
+                Players Online
               </h3>
+              <Badge variant="outline" className="text-xs h-5 border-[#334155] text-[#94a3b8] ml-auto">
+                {onlineUsersList.length}
+              </Badge>
             </div>
             
             {onlineUsersList.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto">
-                {onlineUsersList.map((onlineUser) => (
-                  <div 
-                    key={onlineUser.id}
-                    className="flex items-center gap-3 bg-[#0b0f13] rounded-lg p-3 border border-[#334155]/50"
-                  >
-                    <Avatar className="h-10 w-10 bg-[#f59e0b]/10 border border-[#f59e0b]/20">
-                      <AvatarFallback className="text-[#f59e0b] font-bold">
-                        {onlineUser.name.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white font-semibold truncate">
-                        {onlineUser.name}
-                        {onlineUser.id === user?.id && (
-                          <span className="ml-2 text-xs text-[#f59e0b]">(You)</span>
-                        )}
-                      </p>
-                      <p className="text-[#64748b] text-sm">
-                        ${onlineUser.balance.toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="flex-shrink-0">
-                      <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <ScrollArea className="max-h-[400px]">
+                <Table>
+                  <TableHeader className="bg-[#1e293b]/50 sticky top-0 z-10 backdrop-blur-sm">
+                    <TableRow className="hover:bg-transparent border-b border-[#334155]">
+                      <TableHead className="h-10 text-xs font-bold text-[#94a3b8] w-[60%]">USER</TableHead>
+                      <TableHead className="h-10 text-xs font-bold text-[#94a3b8] text-right">BALANCE</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {onlineUsersList.map((onlineUser) => (
+                      <TableRow key={onlineUser.id} className="hover:bg-[#1e293b]/50 border-b border-[#334155]/50">
+                        <TableCell className="py-3 font-medium text-sm">
+                          <div className="flex items-center gap-3">
+                            <div className="relative shrink-0">
+                              <Avatar className="h-8 w-8 border border-[#334155]">
+                                <AvatarFallback className="text-xs bg-[#1e293b] text-[#94a3b8]">
+                                  {onlineUser.name?.substring(0, 1).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-[#10b981] rounded-full border border-[#1e293b]" />
+                            </div>
+                            <span className={`${onlineUser.id === user?.id ? "text-[#f59e0b]" : "text-[#cbd5e1]"} truncate`}>
+                              {onlineUser.name}
+                              {onlineUser.id === user?.id && (
+                                <span className="ml-2 text-xs text-[#f59e0b]/70">(You)</span>
+                              )}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-3 text-right font-mono text-sm text-[#94a3b8]">
+                          ${onlineUser.balance?.toLocaleString()}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
             ) : (
-              <div className="text-center py-8">
+              <div className="text-center py-12">
                 <Users className="h-12 w-12 text-[#334155] mx-auto mb-2" />
                 <p className="text-[#64748b]">No players online yet</p>
               </div>
@@ -503,16 +515,22 @@ export default function TradingInterface() {
                 <TableBody>
                    {allUsers?.map((u) => {
                       const userActiveBet = activeBets.find(b => b.user_id === u.id)
+                      const isOnline = onlineUsersList.some(onlineUser => onlineUser.id === u.id)
                       return (
                       <TableRow key={u.id} className="hover:bg-[#1e293b]/50 border-b border-[#1e293b]/50 h-10">
                          <TableCell className="py-1 font-medium text-xs">
                             <div className="flex items-center justify-between pr-2">
                                 <div className="flex items-center gap-2 overflow-hidden">
-                                   <Avatar className="h-5 w-5 border border-[#334155] shrink-0">
-                                      <AvatarFallback className="text-[9px] bg-[#1e293b] text-[#94a3b8]">
-                                         {u.name?.substring(0, 1).toUpperCase()}
-                                      </AvatarFallback>
-                                   </Avatar>
+                                   <div className="relative shrink-0">
+                                      <Avatar className="h-5 w-5 border border-[#334155]">
+                                         <AvatarFallback className="text-[9px] bg-[#1e293b] text-[#94a3b8]">
+                                            {u.name?.substring(0, 1).toUpperCase()}
+                                         </AvatarFallback>
+                                      </Avatar>
+                                      {isOnline && (
+                                         <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-[#10b981] rounded-full border border-[#0f172a]" />
+                                      )}
+                                   </div>
                                    <span className={`${u.id === user?.id ? "text-[#f59e0b]" : "text-[#cbd5e1]"} truncate`}>
                                       {u.name}
                                    </span>

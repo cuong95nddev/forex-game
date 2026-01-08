@@ -371,6 +371,8 @@ export const useStore = create<AppState>((set, get) => ({
           if (oldRound && currentRound && currentRound.id !== oldRound.id) {
             // New round started, reset admin lock to allow any admin
             acceptedAdminSession = adminSessionId || null
+            // Reload all users to reflect allowed_users from new round
+            get().loadAllUsers()
           }
           
           set({ currentRound })
@@ -511,13 +513,29 @@ export const useStore = create<AppState>((set, get) => ({
 
   loadAllUsers: async () => {
     try {
-      const { data } = await supabase
-        .from('users')
-        .select('*')
-        .order('balance', { ascending: false })
+      const currentRound = get().currentRound
+      
+      // If there's a current round with allowed_users, filter by that list
+      if (currentRound && currentRound.allowed_users && currentRound.allowed_users.length > 0) {
+        const { data } = await supabase
+          .from('users')
+          .select('*')
+          .in('id', currentRound.allowed_users)
+          .order('balance', { ascending: false })
 
-      if (data) {
-        set({ allUsers: data })
+        if (data) {
+          set({ allUsers: data })
+        }
+      } else {
+        // If no allowed_users restriction, show all users
+        const { data } = await supabase
+          .from('users')
+          .select('*')
+          .order('balance', { ascending: false })
+
+        if (data) {
+          set({ allUsers: data })
+        }
       }
     } catch (error) {
     }
@@ -557,6 +575,8 @@ export const useStore = create<AppState>((set, get) => ({
             userBet: null
             // Don't set countdown here, wait for broadcast from admin with accurate countdown
           })
+          // Reload all users to reflect allowed_users from new round
+          get().loadAllUsers()
         }
       )
       .on(
