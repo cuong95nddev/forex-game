@@ -57,7 +57,6 @@ interface AppState {
   loadAllUsers: () => Promise<void>
 }
 
-let countdownInterval: NodeJS.Timeout | null = null
 let broadcastChannel: any = null
 let goldPriceChannel: any = null
 let roundsChannel: any = null
