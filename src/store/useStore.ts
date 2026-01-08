@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { supabase, type User, type GoldPrice } from '../lib/supabase'
 import { getFingerprint } from '../lib/fingerprint'
-import { initializeDatabase } from '../lib/initDb'
 import { toast } from 'sonner'
 import confetti from 'canvas-confetti'
 
@@ -100,12 +99,6 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       set({ loading: true })
       
-      // Initialize database with initial data if needed
-      await Promise.race([
-        initializeDatabase(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Database initialization timeout')), 10000))
-      ])
-      
       const fingerprint = await getFingerprint()
       
       const { data: userData, error: userError } = await supabase
@@ -126,7 +119,7 @@ export const useStore = create<AppState>((set, get) => ({
         .eq('status', 'active')
         .order('round_number', { ascending: false })
         .limit(1)
-        .single()
+        .maybeSingle()
 
       // Check if user is allowed to participate BEFORE setting the user
       if (userData && roundData && roundData.allowed_users !== undefined && roundData.allowed_users !== null) {
@@ -186,13 +179,13 @@ export const useStore = create<AppState>((set, get) => ({
       const fingerprint = await getFingerprint()
       
       // Check if game is already active - prevent new users from joining mid-game
-      const { data: activeRound } = await supabase
+      const { data: activeRounds } = await supabase
         .from('rounds')
-        .select('*')
+        .select('id, status, round_number, allowed_users')
         .eq('status', 'active')
-        .order('round_number', { ascending: false })
         .limit(1)
-        .single()
+      
+      const activeRound = activeRounds && activeRounds.length > 0 ? activeRounds[0] : null
       
       if (activeRound) {
         throw new Error('Cannot join while a game is in progress. Please wait for the current round to finish.')
@@ -217,7 +210,33 @@ export const useStore = create<AppState>((set, get) => ({
         throw new Error(`Failed to create user: ${userError.message} (Code: ${userError.code})`)
       }
 
+      // Set user first
       set({ user: newUser })
+      
+      // Load latest gold price to prevent "Connecting to market..." stuck state
+      const { data: priceData } = await supabase
+        .from('gold_prices')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (priceData) {
+        set({ goldPrice: priceData })
+      }
+      
+      // Load current round if exists
+      const { data: roundData } = await supabase
+        .from('rounds')
+        .select('*')
+        .eq('status', 'active')
+        .order('round_number', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      
+      if (roundData) {
+        set({ currentRound: roundData, countdown: 0 })
+      }
     } catch (error) {
       throw error
     }
@@ -436,6 +455,21 @@ export const useStore = create<AppState>((set, get) => ({
             set({ priceHistory: updatedHistory })
           }
         }
+      })
+      .on('broadcast', { event: 'system-reset' }, (payload: any) => {
+        // System has been reset - clear user session and force re-login
+        console.log('System reset detected:', payload.payload.message)
+        set({ 
+          user: null, 
+          currentRound: null, 
+          userBet: null, 
+          countdown: 0, 
+          isWaitingForNewGame: false,
+          goldPrice: null 
+        })
+        toast.error(payload.payload.message || 'System has been reset. Please login again.')
+        // Reset admin session
+        acceptedAdminSession = null
       })
       .subscribe()
   },
@@ -725,6 +759,28 @@ export const useStore = create<AppState>((set, get) => ({
           } else if (balanceChange > 0) {
             // Balance increased - user won or got refund
           }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'users',
+          filter: `id=eq.${currentUser.id}`,
+        },
+        async (payload) => {
+          // User was deleted from database - log them out
+          console.log('User deleted from database, logging out...')
+          set({ 
+            user: null, 
+            currentRound: null, 
+            userBet: null, 
+            goldPrice: null,
+            countdown: 0,
+            isWaitingForNewGame: false
+          })
+          toast.error('Your account has been removed. Please login again.')
         }
       )
       .subscribe((status) => {

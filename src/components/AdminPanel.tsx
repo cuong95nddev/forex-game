@@ -705,9 +705,28 @@ export default function AdminPanel() {
 
   const resetAllData = async () => {
     try {
-      // Stop countdown and auto mode
-      setIsAutoMode(false)
-      if (countdownInterval.current) clearInterval(countdownInterval.current)
+      // Stop the game first
+      setIsGameRunning(false)
+      setIsWaitingForConfig(false)
+      
+      // Stop countdown
+      if (countdownInterval.current) {
+        clearInterval(countdownInterval.current)
+        countdownInterval.current = null
+        countdownTimerId.current = null
+      }
+
+      // Broadcast to users that system is being reset (force logout)
+      if (broadcastChannel.current) {
+        broadcastChannel.current.send({
+          type: 'broadcast',
+          event: 'system-reset',
+          payload: {
+            adminSessionId: adminSessionId.current,
+            message: 'System has been reset. Please refresh and login again.'
+          }
+        })
+      }
 
       // Delete all data in order
       await supabase.from('bets').delete().neq('id', '00000000-0000-0000-0000-000000000000')
@@ -715,21 +734,25 @@ export default function AdminPanel() {
       await supabase.from('gold_prices').delete().neq('id', '00000000-0000-0000-0000-000000000000')
       await supabase.from('users').delete().neq('id', '00000000-0000-0000-0000-000000000000')
       
-      // Reset state
+      // Reset all state variables
       setCurrentPrice(2000)
       setPriceChange(0)
       currentPriceRef.current = 2000
       priceChangeRef.current = 0
+      lastTrendRef.current = 0
       setCurrentRound(null)
-      setCountdown(15)
+      setCountdown(roundDuration)
+      pausedCountdown.current = null
+      pausedRound.current = null
       
       // Reinitialize
       await supabase.from('gold_prices').insert({ price: 2000, change: 0 })
       await loadStats()
       await loadUsers()
       
-      toast.success('All data has been reset successfully. You can restart the system now.')
+      toast.success('All data has been reset successfully. The game has been stopped.')
     } catch (error) {
+      console.error('Failed to reset data:', error)
       toast.error('Failed to reset data')
     }
   }

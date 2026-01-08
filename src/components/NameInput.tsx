@@ -17,19 +17,32 @@ export const NameInput: React.FC<NameInputProps> = ({ onSubmit }) => {
 
   const checkGameStatus = useCallback(async () => {
     setChecking(true)
-    // Check if there's an active round or if countdown has started (countdown <= 15 means game is active)
-    const { data: roundData, error } = await supabase
-      .from('rounds')
-      .select('*')
-      .eq('status', 'active')
-      .order('round_number', { ascending: false })
-      .limit(1)
-      .single()
-    
-    // Game is started if there's an active round (regardless of error, assuming no round = allow)
-    const hasActiveRound = roundData && !error
-    setGameStarted(!!hasActiveRound)
-    setChecking(false)
+    try {
+      // Check if there's an active round - use simple query without maybeSingle
+      const { data: roundData, error } = await supabase
+        .from('rounds')
+        .select('id, status')
+        .eq('status', 'active')
+        .limit(1)
+      
+      // If error, log it but don't block user login
+      if (error) {
+        console.warn('Error checking game status (allowing login):', error)
+        setGameStarted(false) // Default to allow login
+        setChecking(false)
+        return
+      }
+      
+      // Game is started if there's at least one active round
+      const hasActiveRound = roundData && roundData.length > 0
+      console.log('Game status check:', { hasActiveRound, roundCount: roundData?.length })
+      setGameStarted(hasActiveRound)
+    } catch (err) {
+      console.error('Exception checking game status (allowing login):', err)
+      setGameStarted(false) // Default to allow login on exception
+    } finally {
+      setChecking(false)
+    }
   }, [])
 
   useEffect(() => {
