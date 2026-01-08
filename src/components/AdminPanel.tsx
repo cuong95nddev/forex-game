@@ -55,6 +55,7 @@ export default function AdminPanel() {
   
   // User management
   const [users, setUsers] = useState<any[]>([])
+  const [currentBets, setCurrentBets] = useState<any[]>([])
   const [activeView, setActiveView] = useState<'dashboard' | 'users' | 'settings' | 'data'>('dashboard')
   const [editingUser, setEditingUser] = useState<string | null>(null)
   const [editBalance, setEditBalance] = useState<number>(0)
@@ -70,6 +71,8 @@ export default function AdminPanel() {
   const pausedCountdown = useRef<number | null>(null)
   const pausedRound = useRef<any>(null)
   const presenceHeartbeatInterval = useRef<any>(null)
+  const betsSubscription = useRef<any>(null)
+  const usersSubscription = useRef<any>(null)
 
   useEffect(() => {
     // Prevent double initialization (React StrictMode)
@@ -88,9 +91,13 @@ export default function AdminPanel() {
       await loadCurrentRound()
       await loadStats()
       await loadUsers()
+      await loadCurrentBets()
       
       // Initialize admin presence
       await initializeAdminPresence()
+      
+      // Setup real-time subscriptions
+      setupRealtimeSubscriptions()
     }
     
     initialize()
@@ -102,6 +109,13 @@ export default function AdminPanel() {
       if (presenceHeartbeatInterval.current) {
         clearInterval(presenceHeartbeatInterval.current)
       }
+      // Clean up subscriptions
+      if (betsSubscription.current) {
+        betsSubscription.current.unsubscribe()
+      }
+      if (usersSubscription.current) {
+        usersSubscription.current.unsubscribe()
+      }
       // Clean up presence on unmount
       cleanupAdminPresence()
       if (broadcastChannel.current) broadcastChannel.current.unsubscribe()
@@ -109,17 +123,14 @@ export default function AdminPanel() {
     }
   }, []) // Empty dependency array - only run once on mount
   
-  // Separate effect for stats polling
+  // Separate effect for stats polling (bets and users update via real-time subscriptions)
   useEffect(() => {
     const statsInterval = setInterval(() => {
       loadStats()
-      if (activeView === 'users') {
-        loadUsers()
-      }
-    }, 3000)
+    }, 5000)
     
     return () => clearInterval(statsInterval)
-  }, [activeView])
+  }, [])
 
   // Effect to handle game running state - start/stop countdown
   useEffect(() => {
@@ -563,8 +574,12 @@ export default function AdminPanel() {
       .limit(1)
       .single()
 
-    setCurrentRound(data)
-    // Don't automatically start countdown - wait for auto mode to be enabled
+    if (data) {
+      setCurrentRound(data)
+      setIsGameRunning(true) // Resume game running state if there's an active round
+      // Load bets after confirming there's a round
+      await loadCurrentBets()
+    }
   }
 
   const initializeAdminPresence = async () => {
@@ -613,6 +628,48 @@ export default function AdminPanel() {
     }
   }
 
+  const setupRealtimeSubscriptions = () => {
+    console.log('Setting up real-time subscriptions for admin...')
+    
+    // Subscribe to bet changes
+    betsSubscription.current = supabase
+      .channel('admin-bets-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bets',
+        },
+        (payload) => {
+          console.log('Bet change detected:', payload)
+          loadCurrentBets()
+        }
+      )
+      .subscribe((status) => {
+        console.log('Bets subscription status:', status)
+      })
+
+    // Subscribe to user changes (balance updates)
+    usersSubscription.current = supabase
+      .channel('admin-users-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'users',
+        },
+        (payload) => {
+          console.log('User change detected:', payload)
+          loadUsers()
+        }
+      )
+      .subscribe((status) => {
+        console.log('Users subscription status:', status)
+      })
+  }
+
   const loadStats = async () => {
     const { count: roundCount } = await supabase
       .from('rounds')
@@ -659,6 +716,23 @@ export default function AdminPanel() {
       toast.success('Balance updated successfully')
     } catch (error) {
       toast.error('Failed to update balance')
+    }
+  }
+
+  const loadCurrentBets = async () => {
+    try {
+      // Load recent bets from last 50 bets across all rounds
+      const { data } = await supabase
+        .from('bets')
+        .select('*, users(name)')
+        .order('created_at', { ascending: false })
+        .limit(50)
+      
+      if (data) {
+        setCurrentBets(data)
+      }
+    } catch (error) {
+      console.error('Failed to load bets:', error)
     }
   }
 
@@ -916,6 +990,7 @@ export default function AdminPanel() {
     if (newRound) {
       setCurrentRound(newRound)
       startCountdownTimer(newRound)
+      // Keep bets - they will accumulate across rounds
     }
   }
 
@@ -1240,77 +1315,215 @@ export default function AdminPanel() {
                 </div>
               )}
 
-              {/* Stats Grid */}
+              {/* Compact Stats */}
               {currentRound && (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-3 md:grid-cols-4">
                 {[
-                  { label: 'Total Rounds', value: stats.totalRounds, icon: RefreshCw },
-                  { label: 'Active Players', value: stats.activePlayers, icon: Users },
-                  { label: 'Total Bets', value: stats.totalBets, icon: Database },
-                  { label: 'Current Price', value: `$${currentPrice.toFixed(2)}`, sub: `${priceChange >= 0 ? '+' : ''}${priceChange.toFixed(2)}`, icon: TrendingUp, color: priceChange >= 0 ? 'text-[#10b981]' : 'text-[#ef4444]' },
+                  { label: 'Round', value: `#${currentRound.round_number}`, icon: RefreshCw },
+                  { label: 'Players', value: stats.activePlayers, icon: Users },
+                  { label: 'Bets', value: stats.totalBets, icon: Database },
+                  { label: 'Price', value: `$${currentPrice.toFixed(2)}`, sub: `${priceChange >= 0 ? '+' : ''}${priceChange.toFixed(2)}`, icon: TrendingUp, color: priceChange >= 0 ? 'text-[#10b981]' : 'text-[#ef4444]' },
                 ].map((stat, i) => (
-                  <div key={i} className="bg-[#0b0f13] border border-[#1e293b] p-4 rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                       <span className="text-[#94a3b8] text-[10px] uppercase font-bold tracking-wider">{stat.label}</span>
-                       <stat.icon size={14} className="text-[#94a3b8]" />
+                  <div key={i} className="bg-[#0b0f13] border border-[#1e293b] p-3 rounded-lg">
+                    <div className="flex items-center justify-between mb-1">
+                       <span className="text-[#94a3b8] text-[9px] uppercase font-bold tracking-wider">{stat.label}</span>
+                       <stat.icon size={12} className="text-[#94a3b8]" />
                     </div>
-                    <div className={`text-2xl font-mono font-bold text-white`}>
+                    <div className={`text-xl font-mono font-bold text-white`}>
                        {stat.value}
                     </div>
                     {stat.sub && (
-                       <div className={`text-xs font-bold mt-1 ${stat.color}`}>{stat.sub}</div>
+                       <div className={`text-[10px] font-bold mt-0.5 ${stat.color}`}>{stat.sub}</div>
                     )}
                   </div>
                 ))}
               </div>
               )}
 
-               {/* Current Round Card */}
+               {/* Compact Round Info & Traders */}
               {currentRound && (
-                <div className="bg-[#0b0f13] border border-[#1e293b] rounded-lg overflow-hidden">
-                  <div className="border-b border-[#1e293b] bg-[#1e293b]/30 px-6 py-4 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                       <RefreshCw className="h-4 w-4 animate-spin text-[#f59e0b]" />
-                       <h3 className="font-bold text-white text-xs uppercase tracking-wider">Round #{currentRound.round_number}</h3>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {/* Round Info */}
+                  <div className="bg-[#0b0f13] border border-[#1e293b] rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <RefreshCw className="h-3 w-3 animate-spin text-[#f59e0b]" />
+                        <h3 className="font-bold text-white text-[10px] uppercase tracking-wider">Round Info</h3>
+                      </div>
+                      <Badge variant="outline" className="border-[#10b981] text-[#10b981] bg-[#10b981]/10 text-[9px] h-5">ACTIVE</Badge>
                     </div>
-                    <Badge variant="outline" className="border-[#10b981] text-[#10b981] bg-[#10b981]/10">ACTIVE</Badge>
-                  </div>
-                  <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="bg-[#0b0f13] p-4 rounded-lg border border-[#1e293b]">
-                         <div className="text-[#94a3b8] text-[10px] uppercase font-bold tracking-wider mb-2">Start Price</div>
-                         <div className="text-2xl font-mono font-bold text-white">${currentRound.start_price.toFixed(2)}</div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="bg-[#1e293b]/50 p-2 rounded">
+                        <div className="text-[#94a3b8] text-[9px] uppercase font-bold mb-1">Start</div>
+                        <div className="text-sm font-mono font-bold text-white">${currentRound.start_price.toFixed(2)}</div>
                       </div>
-                      <div className="bg-[#0b0f13] p-4 rounded-lg border border-[#1e293b]">
-                         <div className="text-[#94a3b8] text-[10px] uppercase font-bold tracking-wider mb-2">Current Price</div>
-                         <div className={`text-2xl font-mono font-bold ${currentPrice >= currentRound.start_price ? 'text-[#10b981]' : 'text-[#ef4444]'}`}>
-                            ${currentPrice.toFixed(2)}
-                         </div>
+                      <div className="bg-[#1e293b]/50 p-2 rounded">
+                        <div className="text-[#94a3b8] text-[9px] uppercase font-bold mb-1">Current</div>
+                        <div className={`text-sm font-mono font-bold ${currentPrice >= currentRound.start_price ? 'text-[#10b981]' : 'text-[#ef4444]'}`}>
+                          ${currentPrice.toFixed(2)}
+                        </div>
                       </div>
-                      <div className="bg-[#0b0f13] p-4 rounded-lg border border-[#1e293b]">
-                        <div className="text-[#94a3b8] text-[10px] uppercase font-bold tracking-wider mb-2">Time Remaining</div>
-                         <div className={`text-2xl font-mono font-bold flex items-center gap-2 ${countdown <= 5 ? 'text-[#ef4444] animate-pulse' : 'text-[#f59e0b]'}`}>
-                          <Clock size={20} />
+                      <div className="bg-[#1e293b]/50 p-2 rounded">
+                        <div className="text-[#94a3b8] text-[9px] uppercase font-bold mb-1">Time</div>
+                        <div className={`text-sm font-mono font-bold flex items-center gap-1 ${countdown <= 5 ? 'text-[#ef4444] animate-pulse' : 'text-[#f59e0b]'}`}>
+                          <Clock size={12} />
                           {countdown}s
-                         </div>
+                        </div>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Active Traders */}
+                  <div className="bg-[#0b0f13] border border-[#1e293b] rounded-lg overflow-hidden">
+                    <div className="border-b border-[#1e293b] bg-[#1e293b]/30 px-4 py-2 flex items-center justify-between">
+                      <h3 className="font-bold text-white text-[10px] uppercase tracking-wider">Traders</h3>
+                      <Badge variant="outline" className="border-[#94a3b8] text-[#94a3b8] text-[9px] h-4 px-1.5">{users.length}</Badge>
+                    </div>
+                    <div className="px-3 py-2 flex items-center justify-between border-b border-[#1e293b]/50">
+                      <div className="text-[#94a3b8] text-[8px] uppercase font-bold">User</div>
+                      <div className="text-[#94a3b8] text-[8px] uppercase font-bold">Balance</div>
+                    </div>
+                    <ScrollArea className="h-[140px]">
+                      <div className="px-3 pb-2 space-y-1">
+                        {users.slice(0, 10).map((user) => {
+                          // Find user's bet in current round only
+                          const userBet = currentRound ? currentBets.find(bet => bet.user_id === user.id && bet.round_id === currentRound.id) : null
+                          const initials = user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 1)
+                          return (
+                            <div key={user.id} className="flex items-center justify-between py-1.5 hover:bg-[#1e293b]/30 rounded px-2 transition-colors">
+                              <div className="flex items-center gap-2 flex-1 min-w-0 pr-2">
+                                <div className="relative shrink-0">
+                                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold ${userBet ? 'bg-[#10b981]' : 'bg-[#334155]'}`}>
+                                    {initials}
+                                  </div>
+                                  <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-[#10b981] rounded-full border-2 border-[#0b0f13]"></div>
+                                </div>
+                                <span className="text-white text-[11px] font-medium truncate">{user.name}</span>
+                              </div>
+                              {userBet && (
+                                <div className={`flex items-center gap-1 shrink-0 mr-2 ${userBet.prediction === 'up' ? 'text-[#10b981]' : 'text-[#ef4444]'}`}>
+                                  {userBet.prediction === 'up' ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                                  <span className="text-[10px] font-bold">${userBet.bet_amount}</span>
+                                </div>
+                              )}
+                              <span className="text-[#94a3b8] text-[10px] font-mono">${user.balance?.toLocaleString()}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </ScrollArea>
                   </div>
                 </div>
               )}
 
-              {/* Auto Mode Config View */}
+              {/* Market Activity */}
               {isGameRunning && (
-                <div className="bg-[#0b0f13] border border-[#1e293b] rounded-lg p-6">
-                  <h3 className="font-bold text-white mb-4 text-xs uppercase tracking-widest">Configuration</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-[#0b0f13] border border-[#1e293b] rounded-lg overflow-hidden">
+                  <div className="border-b border-[#1e293b] bg-[#1e293b]/30 px-4 py-2 flex items-center justify-between">
+                    <h3 className="font-bold text-white text-[10px] uppercase tracking-wider">Recent Activity</h3>
+                    <Badge variant="outline" className="border-[#94a3b8] text-[#94a3b8] text-[8px] h-4 px-1">
+                      {currentBets.length} trades
+                    </Badge>
+                  </div>
+                  <ScrollArea className="h-[200px]">
+                    <Table>
+                      <TableHeader className="bg-[#1e293b]/50 sticky top-0">
+                        <TableRow className="border-[#1e293b] hover:bg-transparent">
+                          <TableHead className="text-[#94a3b8] text-[9px] uppercase font-bold h-8 py-1">Time</TableHead>
+                          <TableHead className="text-[#94a3b8] text-[9px] uppercase font-bold h-8 py-1">Trader</TableHead>
+                          <TableHead className="text-[#94a3b8] text-[9px] uppercase font-bold h-8 py-1">Type</TableHead>
+                          <TableHead className="text-[#94a3b8] text-[9px] uppercase font-bold h-8 py-1 text-right">Amount</TableHead>
+                          <TableHead className="text-[#94a3b8] text-[9px] uppercase font-bold h-8 py-1 text-right">Payout</TableHead>
+                          <TableHead className="text-[#94a3b8] text-[9px] uppercase font-bold h-8 py-1 text-right">Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {currentBets.map((bet) => {
+                          const user = users.find(u => u.id === bet.user_id)
+                          const userName = bet.users?.name || user?.name || 'Unknown'
+                          const initials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 1)
+                          return (
+                            <TableRow key={bet.id} className="border-[#1e293b] hover:bg-[#1e293b]/30 h-8">
+                              <TableCell className="py-1 text-[10px] font-mono text-[#94a3b8]">
+                                {new Date(bet.created_at).toLocaleTimeString()}
+                              </TableCell>
+                              <TableCell className="py-1">
+                                <div className="flex items-center gap-2">
+                                  <div className="relative">
+                                    <div className="w-5 h-5 rounded-full bg-gradient-to-br from-[#10b981] to-[#059669] flex items-center justify-center text-white text-[8px] font-bold">
+                                      {initials}
+                                    </div>
+                                    <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-[#10b981] rounded-full border border-[#0b0f13]"></div>
+                                  </div>
+                                  <span className="text-[10px] text-white font-medium">{userName}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="py-1">
+                                <span className={`text-[9px] font-bold px-2 py-1 rounded ${bet.prediction === 'up' ? 'bg-[#10b981]/20 text-[#10b981]' : 'bg-[#ef4444]/20 text-[#ef4444]'}`}>
+                                  {bet.prediction === 'up' ? 'BUY / UP' : 'SELL / DOWN'}
+                                </span>
+                              </TableCell>
+                              <TableCell className="py-1 text-[10px] font-mono text-right text-white">
+                                ${bet.bet_amount.toLocaleString()}
+                              </TableCell>
+                              <TableCell className="py-1 text-[10px] font-mono font-bold text-right">
+                                {bet.result === 'won' && (
+                                  <span className="text-[#10b981]">+{bet.profit?.toFixed(0) || '0'}</span>
+                                )}
+                                {bet.result === 'lost' && (
+                                  <span className="text-[#ef4444]">-{bet.bet_amount}</span>
+                                )}
+                                {bet.result === 'pending' && (
+                                  <span className="text-[#94a3b8]">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="py-1 text-right">
+                                {bet.result === 'won' && (
+                                  <span className="text-[9px] font-bold px-2 py-1 rounded border border-[#10b981] text-[#10b981]">
+                                    WIN
+                                  </span>
+                                )}
+                                {bet.result === 'lost' && (
+                                  <span className="text-[9px] font-bold px-2 py-1 rounded border border-[#ef4444] text-[#ef4444]">
+                                    LOSS
+                                  </span>
+                                )}
+                                {bet.result === 'pending' && (
+                                  <span className="text-[9px] font-bold px-2 py-1 rounded border border-[#94a3b8] text-[#94a3b8]">
+                                    PENDING
+                                  </span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })}
+                        {currentBets.length === 0 && (
+                          <TableRow className="border-[#1e293b]">
+                            <TableCell colSpan={4} className="py-4 text-center text-[10px] text-[#94a3b8]">
+                              No bets placed yet
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </ScrollArea>
+                </div>
+              )}
+
+              {/* Compact Config */}
+              {isGameRunning && (
+                <div className="bg-[#0b0f13] border border-[#1e293b] rounded-lg p-3">
+                  <h3 className="font-bold text-white mb-2 text-[9px] uppercase tracking-widest">Config</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                       {[
-                        { label: 'Update Interval', value: `${priceUpdateInterval}s` },
+                        { label: 'Update', value: `${priceUpdateInterval}s` },
                         { label: 'Win Rate', value: `${(winRate*100).toFixed(0)}%` },
-                        { label: 'Bet Range', value: `$${minBetAmount} - $${maxBetAmount}` },
-                        { label: 'No Bet Penalty', value: `$${noBetPenalty}` },
+                        { label: 'Bet Range', value: `$${minBetAmount}-${maxBetAmount}` },
+                        { label: 'Penalty', value: `$${noBetPenalty}` },
                       ].map((item, i) => (
-                        <div key={i} className="bg-[#1e293b]/50 p-3 rounded border border-[#1e293b]">
-                          <div className="text-[#94a3b8] text-[10px] uppercase font-bold mb-1">{item.label}</div>
-                          <div className="font-mono text-sm text-white">{item.value}</div>
+                        <div key={i} className="bg-[#1e293b]/50 p-2 rounded border border-[#1e293b]">
+                          <div className="text-[#94a3b8] text-[8px] uppercase font-bold mb-0.5">{item.label}</div>
+                          <div className="font-mono text-xs text-white">{item.value}</div>
                         </div>
                       ))}
                   </div>
