@@ -918,33 +918,22 @@ export default function AdminPanel() {
             (bet.prediction === 'down' && !priceWentUp)
 
           const result = userWon ? 'won' : 'lost'
-          const baseProfit = userWon ? bet.bet_amount * winRate : 0
+          const profit = userWon ? bet.bet_amount * winRate : 0
 
-          // Use the resolve_bet_with_skills function
-          const { data: resolutionData, error: resolutionError } = await supabase.rpc('resolve_bet_with_skills', {
-            p_bet_id: bet.id,
-            p_result: result,
-            p_base_profit: baseProfit
-          })
+          // Update bet result
+          await supabase
+            .from('bets')
+            .update({ result, profit })
+            .eq('id', bet.id)
 
-          if (resolutionError) {
-            console.error('Error resolving bet with skills:', resolutionError)
-            // Fallback to old method
+          // Update user balance if they won
+          if (userWon) {
+            const balanceChange = bet.bet_amount + profit
+            const newBalance = bet.users.balance + balanceChange
             await supabase
-              .from('bets')
-              .update({ result, profit: baseProfit })
-              .eq('id', bet.id)
-
-            if (userWon) {
-              const balanceChange = bet.bet_amount + baseProfit
-              const newBalance = bet.users.balance + balanceChange
-              await supabase
-                .from('users')
-                .update({ balance: newBalance })
-                .eq('id', bet.user_id)
-            }
-          } else if (resolutionData?.had_double && userWon) {
-            console.log(`User ${bet.user_id} had double skill active! Profit: ${resolutionData.final_profit}`)
+              .from('users')
+              .update({ balance: newBalance })
+              .eq('id', bet.user_id)
           }
         }
       }
@@ -1078,6 +1067,8 @@ export default function AdminPanel() {
       .single()
 
     const newRoundNumber = (lastRound?.round_number || 0) + 1
+
+    console.log(`🔄 Starting new round ${newRoundNumber}`)
 
     // Get all online users (active in last 5 seconds)
     const { data: presenceData } = await supabase

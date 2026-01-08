@@ -298,6 +298,25 @@ export const useStore = create<AppState>((set, get) => ({
       return false
     }
 
+    // Clean up expired freeze effects
+    console.log('Placing bet, checking for expired freeze effects. Current round:', currentRound.round_number)
+    await supabase.rpc('cleanup_expired_freeze_effects', {
+      p_current_round: currentRound.round_number
+    })
+    
+    // Reload active effects after cleanup
+    await get().loadActiveSkillEffects()
+    
+    // Get fresh activeSkillEffects from state after reload
+    const { activeSkillEffects } = get()
+    console.log('Active skill effects after cleanup:', activeSkillEffects)
+
+    // Check if user is frozen
+    if (activeSkillEffects.some(e => e.user_id === user.id && e.skill_type === 'freeze')) {
+      toast.error('❄️ You are frozen and cannot place bets!')
+      return false
+    }
+
     if (countdown <= 0) {
       toast.warning('Betting time is over for this round!')
       return false
@@ -397,7 +416,7 @@ export const useStore = create<AppState>((set, get) => ({
     broadcastChannel = supabase.channel('game-state')
     
     broadcastChannel
-      .on('broadcast', { event: 'game-state' }, (payload: any) => {
+      .on('broadcast', { event: 'game-state' }, async (payload: any) => {
         const { countdown, currentRound, goldPrice, winRate: broadcastWinRate, adminSessionId, isWaiting } = payload.payload
         
         
@@ -448,6 +467,12 @@ export const useStore = create<AppState>((set, get) => ({
             acceptedAdminSession = adminSessionId || null
             // Reload all users to reflect allowed_users from new round
             get().loadAllUsers()
+            // Clean up expired freeze effects on new round
+            console.log('New round started, cleaning up freeze effects. Old round:', oldRound.round_number, 'New round:', currentRound.round_number)
+            await supabase.rpc('cleanup_expired_freeze_effects', { p_current_round: currentRound.round_number })
+            console.log('Freeze cleanup completed, reloading active effects...')
+            await get().loadActiveSkillEffects()
+            console.log('Active effects reloaded after round change')
           }
           
           set({ currentRound })
@@ -581,7 +606,7 @@ export const useStore = create<AppState>((set, get) => ({
           toast.info(`🏁 Game completed after ${maxRound} rounds!`)
         }
       })
-      .on('broadcast', { event: 'game-started' }, (payload: any) => {
+      .on('broadcast', { event: 'game-started' }, async (payload: any) => {
         // New game started - clear completed state
         console.log('New game started:', payload.payload)
         
@@ -589,8 +614,20 @@ export const useStore = create<AppState>((set, get) => ({
           isGameCompleted: false,
           leaderboard: [],
           maxRound: null,
-          isWaitingForNewGame: false
+          isWaitingForNewGame: false,
+          activeSkillEffects: [], // Clear all active skill effects on frontend
+          userBet: null // Clear current bet
         })
+        
+        // Wait for database cleanup to complete
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
+        console.log('🔄 Reloading user data and skills after new game...')
+        // Reload user data and skills
+        await get().loadUser()
+        await get().loadUserSkills() // Reload skills assigned to user
+        await get().loadActiveSkillEffects() // Should be empty now
+        console.log('✅ User data reloaded. Active effects:', get().activeSkillEffects)
         
         toast.success('🎮 New game has started!')
       })
@@ -1025,6 +1062,7 @@ export const useStore = create<AppState>((set, get) => ({
     if (!user) return
 
     try {
+      console.log('Loading user skills for user:', user.id)
       const { data, error } = await supabase
         .from('user_skills')
         .select(`
@@ -1050,10 +1088,13 @@ export const useStore = create<AppState>((set, get) => ({
         return
       }
 
+      console.log('User skills loaded:', data)
+
       const skills = (data || []).map((item: any) => ({
         ...item,
         skill: Array.isArray(item.skill) ? item.skill[0] : item.skill
       }))
+      console.log('Processed skills:', skills)
       set({ userSkills: skills })
     } catch (error) {
       console.error('Error loading user skills:', error)
@@ -1061,71 +1102,34 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   useSkill: async (_skillId: string, targetUserId: string, currentRound: number) => {
-    const { user, loadUser, loadUserSkills, loadActiveSkillEffects } = get()
+    const { user } = get()
     if (!user) {
       toast.error('User not found')
       return false
     }
 
     try {
-      // Get the skill to determine its type
-      const skill = get().userSkills.find(s => s.skill_id === _skillId)
-      if (!skill?.skill) {
-        toast.error('Skill not found')
-        return false
-      }
-
-      let data: any
-      let error: any
-
-      // Call the appropriate RPC function based on skill type
-      if (skill.skill.skill_type === 'steal') {
-        const result = await supabase.rpc('use_steal_money_skill', {
-          p_user_id: user.id,
-          p_target_user_id: targetUserId,
-          p_current_round: currentRound,
+      // Insert skill request for admin to process
+      const { error } = await supabase
+        .from('skill_requests')
+        .insert({
+          user_id: user.id,
+          skill_id: _skillId,
+          target_user_id: targetUserId || null,
+          round_number: currentRound,
+          status: 'pending'
         })
-        data = result.data
-        error = result.error
-      } else if (skill.skill.skill_type === 'double') {
-        const result = await supabase.rpc('use_double_skill', {
-          p_user_id: user.id,
-          p_current_round: currentRound,
-        })
-        data = result.data
-        error = result.error
-      } else {
-        toast.error('Unknown skill type')
-        return false
-      }
 
       if (error) {
-        console.error('Error using skill:', error)
-        toast.error(error.message || 'Failed to use skill')
+        console.error('Error requesting skill:', error)
+        toast.error('Failed to use skill')
         return false
       }
 
-      if (!data || !data.success) {
-        toast.error(data?.error || 'Failed to use skill')
-        return false
-      }
-
-      // Success!
-      if (skill.skill.skill_type === 'steal') {
-        const amount = data.amount
-        toast.success(`💰 Successfully stole $${amount.toLocaleString()} from target!`)
-      } else if (skill.skill.skill_type === 'double') {
-        toast.success(`✨ ${data.message || 'Double profit activated!'}`)
-      }
-      
-      // Reload user and skills to get updated balance and cooldowns
-      await loadUser()
-      await loadUserSkills()
-      await loadActiveSkillEffects()
-      
+      toast.success('Skill requested! Processing...')
       return true
     } catch (error: any) {
-      console.error('Error using skill:', error)
+      console.error('Error requesting skill:', error)
       toast.error(error.message || 'Failed to use skill')
       return false
     }
@@ -1152,9 +1156,20 @@ export const useStore = create<AppState>((set, get) => ({
           console.log('Skill usage detected:', payload)
           const usage = payload.new
           
-          if (usage.result === 'success') {
-            // Show notification that money was stolen
-            const amount = usage.amount || 0
+          // Get skill details to determine type
+          const { data: skillData } = await supabase
+            .from('skill_definitions')
+            .select('skill_type, name')
+            .eq('id', usage.skill_id)
+            .single()
+          
+          if (!skillData) return
+          
+          console.log('Skill type:', skillData.skill_type, 'Metadata:', usage.metadata)
+          
+          // Handle different skill types
+          if (skillData.skill_type === 'steal') {
+            const amount = usage.metadata?.amount_stolen || 0
             console.log('Money stolen from user:', amount)
             
             setSkillNotification({
@@ -1162,13 +1177,29 @@ export const useStore = create<AppState>((set, get) => ({
               amount: -amount
             })
 
-            // Show toast
             toast.error(`💸 $${amount.toLocaleString()} was stolen from you!`, {
               duration: 5000
             })
 
-            // Reload user to get updated balance
             await loadUser()
+
+            setTimeout(() => {
+              setSkillNotification(null)
+            }, 5000)
+          } else if (skillData.skill_type === 'freeze') {
+            console.log('User was frozen')
+            
+            setSkillNotification({
+              message: `You have been frozen!`,
+              amount: 0
+            })
+
+            toast.error(`❄️ You have been frozen and cannot bet for 1 round!`, {
+              duration: 5000
+            })
+
+            // Reload active effects to show freeze status
+            get().loadActiveSkillEffects()
 
             // Clear notification after 5 seconds
             setTimeout(() => {

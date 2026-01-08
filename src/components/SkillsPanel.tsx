@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Sparkles, Target, Clock, AlertCircle } from 'lucide-react'
+import { Sparkles, Target, Clock, AlertCircle, Snowflake } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -54,14 +54,8 @@ export default function SkillsPanel() {
       return
     }
 
-    const cooldownRemaining = getCooldownRemaining(skill)
-    if (cooldownRemaining > 0) {
-      toast.error(`Skill is on cooldown. ${cooldownRemaining} round${cooldownRemaining > 1 ? 's' : ''} remaining.`)
-      return
-    }
-
-    // For steal money skill, show target selection
-    if (skill.skill?.skill_type === 'steal') {
+    // For steal money and freeze skills, show target selection
+    if (skill.skill?.skill_type === 'steal' || skill.skill?.skill_type === 'freeze') {
       setSelectedSkill(skill)
       setShowTargetDialog(true)
     } 
@@ -103,20 +97,22 @@ export default function SkillsPanel() {
       setShowTargetDialog(false)
       setSelectedSkill(null)
       setSelectedTarget(null)
-      loadUserSkills() // Refresh skills to update cooldown
-      loadActiveSkillEffects() // Refresh active effects
+      loadUserSkills()
+      loadActiveSkillEffects()
     }
   }
 
-  const getCooldownRemaining = (skill: UserSkill): number => {
-    if (!currentRound || !skill.skill) return 0
-    const roundsSinceUse = currentRound.round_number - skill.last_used_round
-    const remaining = skill.skill.cooldown_rounds - roundsSinceUse
-    return Math.max(0, remaining)
-  }
-
   const getTargetableUsers = () => {
-    return allUsers.filter(u => u.id !== user?.id && u.balance >= 100)
+    if (selectedSkill?.skill?.skill_type === 'steal') {
+      return allUsers.filter(u => u.id !== user?.id && u.balance >= 100)
+    } else if (selectedSkill?.skill?.skill_type === 'freeze') {
+      // For freeze, exclude users who are already frozen
+      return allUsers.filter(u => 
+        u.id !== user?.id && 
+        !activeSkillEffects.some(e => e.user_id === u.id && e.skill_type === 'freeze')
+      )
+    }
+    return []
   }
 
   const getStealAmountRange = (targetBalance: number): string => {
@@ -148,21 +144,17 @@ export default function SkillsPanel() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {userSkills.map((userSkill) => {
-            const cooldownRemaining = getCooldownRemaining(userSkill)
-            const isOnCooldown = cooldownRemaining > 0
             const isDoubleActive = userSkill.skill?.skill_type === 'double' && activeSkillEffects.some(e => e.skill_type === 'double')
             
             return (
               <Card
                 key={userSkill.id}
                 className={`relative overflow-hidden border transition-all cursor-pointer ${
-                  isOnCooldown
-                    ? 'bg-[#1e293b]/50 border-[#334155] opacity-60 cursor-not-allowed'
-                    : isDoubleActive
+                  isDoubleActive
                     ? 'bg-gradient-to-br from-[#1e293b] to-[#2d691b] border-[#10b981] animate-pulse'
                     : 'bg-gradient-to-br from-[#1e293b] to-[#2d1b69] border-[#a855f7]/30 hover:border-[#a855f7] hover:shadow-lg hover:shadow-[#a855f7]/20'
                 }`}
-                onClick={() => !isOnCooldown && !isDoubleActive && handleSkillClick(userSkill)}
+                onClick={() => !isDoubleActive && handleSkillClick(userSkill)}
               >
                 <div className="p-4">
                   {/* Skill Icon */}
@@ -170,20 +162,18 @@ export default function SkillsPanel() {
                     <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
                       isDoubleActive 
                         ? 'bg-gradient-to-br from-[#10b981] to-[#059669]'
+                        : userSkill.skill?.skill_type === 'freeze'
+                        ? 'bg-gradient-to-br from-[#3b82f6] to-[#1d4ed8]'
                         : 'bg-gradient-to-br from-[#a855f7] to-[#7c3aed]'
                     }`}>
                       {userSkill.skill?.skill_type === 'double' ? (
                         <Sparkles className="h-5 w-5 text-white" />
+                      ) : userSkill.skill?.skill_type === 'freeze' ? (
+                        <Snowflake className="h-5 w-5 text-white" />
                       ) : (
                         <Target className="h-5 w-5 text-white" />
                       )}
                     </div>
-                    {isOnCooldown && (
-                      <Badge className="bg-[#334155] text-[#94a3b8] text-xs border-0">
-                        <Clock className="h-3 w-3 mr-1" />
-                        {cooldownRemaining}R
-                      </Badge>
-                    )}
                     {isDoubleActive && (
                       <Badge className="bg-[#10b981] text-white text-xs border-0 animate-pulse">
                         ACTIVE
@@ -203,24 +193,14 @@ export default function SkillsPanel() {
                     {userSkill.skill && (
                       <div className="flex items-center gap-2 text-xs">
                         <Badge variant="outline" className="border-[#a855f7]/50 text-[#a855f7] text-[10px]">
-                          Cooldown: {userSkill.skill.cooldown_rounds}R
+                          {userSkill.skill.skill_type === 'steal' ? 'Steal' : 
+                           userSkill.skill.skill_type === 'freeze' ? 'Freeze' : 
+                           userSkill.skill.skill_type === 'double' ? 'Boost' : 'Skill'}
                         </Badge>
                       </div>
                     )}
                   </div>
                 </div>
-
-                {/* Cooldown Overlay */}
-                {isOnCooldown && (
-                  <div className="absolute inset-0 bg-[#0f172a]/60 backdrop-blur-[2px] flex items-center justify-center pointer-events-none">
-                    <div className="text-center">
-                      <Clock className="h-6 w-6 text-[#94a3b8] mx-auto mb-1" />
-                      <p className="text-xs text-[#94a3b8] font-bold">
-                        {cooldownRemaining} Round{cooldownRemaining > 1 ? 's' : ''}
-                      </p>
-                    </div>
-                  </div>
-                )}
               </Card>
             )
           })}
@@ -239,7 +219,11 @@ export default function SkillsPanel() {
         <DialogContent className="bg-[#0f172a] border-[#334155] text-white max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-[#a855f7]" />
+              {selectedSkill?.skill?.skill_type === 'freeze' ? (
+                <Snowflake className="h-5 w-5 text-[#3b82f6]" />
+              ) : (
+                <Target className="h-5 w-5 text-[#a855f7]" />
+              )}
               Select Target
             </DialogTitle>
             <DialogDescription className="text-[#94a3b8]">
@@ -251,7 +235,9 @@ export default function SkillsPanel() {
             <div className="space-y-2">
               {getTargetableUsers().map((targetUser) => {
                 const isSelected = selectedTarget === targetUser.id
-                const stealRange = getStealAmountRange(targetUser.balance)
+                const stealRange = selectedSkill?.skill?.skill_type === 'steal' 
+                  ? getStealAmountRange(targetUser.balance) 
+                  : null
                 
                 return (
                   <button
@@ -259,7 +245,9 @@ export default function SkillsPanel() {
                     onClick={() => setSelectedTarget(targetUser.id)}
                     className={`w-full p-3 rounded-lg border transition-all text-left ${
                       isSelected
-                        ? 'bg-[#a855f7]/20 border-[#a855f7]'
+                        ? selectedSkill?.skill?.skill_type === 'freeze'
+                          ? 'bg-[#3b82f6]/20 border-[#3b82f6]'
+                          : 'bg-[#a855f7]/20 border-[#a855f7]'
                         : 'bg-[#1e293b] border-[#334155] hover:border-[#a855f7]/50'
                     }`}
                   >
@@ -277,10 +265,17 @@ export default function SkillsPanel() {
                           </p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-xs text-[#64748b]">Steal</p>
-                        <p className="text-sm font-bold text-[#a855f7]">{stealRange}</p>
-                      </div>
+                      {selectedSkill?.skill?.skill_type === 'steal' && stealRange && (
+                        <div className="text-right">
+                          <p className="text-xs text-[#64748b]">Steal</p>
+                          <p className="text-sm font-bold text-[#a855f7]">{stealRange}</p>
+                        </div>
+                      )}
+                      {selectedSkill?.skill?.skill_type === 'freeze' && (
+                        <div className="text-right">
+                          <Snowflake className="h-5 w-5 text-[#3b82f6]" />
+                        </div>
+                      )}
                     </div>
                   </button>
                 )
@@ -291,7 +286,9 @@ export default function SkillsPanel() {
                   <AlertCircle className="h-12 w-12 text-[#64748b] mx-auto mb-2" />
                   <p className="text-sm text-[#94a3b8]">No valid targets available</p>
                   <p className="text-xs text-[#64748b] mt-1">
-                    Players need at least $100 to be targetable
+                    {selectedSkill?.skill?.skill_type === 'steal' 
+                      ? 'Players need at least $100 to be targetable'
+                      : 'All other players are already frozen'}
                   </p>
                 </div>
               )}
