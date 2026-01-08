@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { TrendingUp, TrendingDown, Clock, DollarSign, Users } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import TradingChart from './TradingChart'
+import SkillsPanel from './SkillsPanel'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -38,7 +39,9 @@ export default function TradingInterface() {
     isWaitingForNewGame,
     isGameCompleted,
     leaderboard,
-    maxRound
+    maxRound,
+    skillNotification,
+    setSkillNotification
   } = useStore()
   
   const [betAmount, setBetAmount] = useState('100')
@@ -94,7 +97,9 @@ export default function TradingInterface() {
       loadActiveBets()
     }, 5000)
     
-    return () => clearInterval(interval)
+    return () => {
+      clearInterval(interval)
+    }
   }, [loadRecentBets, loadActiveBets, loadPriceHistory, loadOnlineUsers, loadAllUsers])
 
   useEffect(() => {
@@ -151,6 +156,16 @@ export default function TradingInterface() {
     }
   }, [lastLossAmount, setLastLossAmount])
 
+  useEffect(() => {
+    if (skillNotification !== null) {
+       // Clear the skill notification after 5 seconds
+       const timer = setTimeout(() => {
+          setSkillNotification(null)
+       }, 5000)
+       return () => clearTimeout(timer)
+    }
+  }, [skillNotification, setSkillNotification])
+
   const handleBet = async (prediction: 'up' | 'down') => {
     const amount = parseFloat(betAmount)
     if (isNaN(amount) || amount <= 0) {
@@ -181,7 +196,7 @@ export default function TradingInterface() {
   }
 
   // Show waiting state when admin is configuring new game or no active game
-  if (isGameCompleted && leaderboard.length > 0) {
+  if (isGameCompleted && leaderboard.length > 0 && maxRound) {
     return (
       <div className="min-h-screen bg-[#131722] flex items-center justify-center p-4">
         <div className="max-w-5xl w-full">
@@ -412,6 +427,20 @@ export default function TradingInterface() {
             </div>
          </div>
       )}
+
+      {/* SKILL NOTIFICATION OVERLAY */}
+      {skillNotification !== null && (
+         <div className="absolute inset-0 z-[100] flex items-center justify-center pointer-events-none">
+            <div className="flex flex-col items-center animate-in fade-in zoom-in slide-in-from-bottom-10 duration-500">
+               <div className="text-6xl font-black text-[#a855f7] drop-shadow-[0_0_15px_rgba(168,85,247,0.5)] mb-2">
+                  {skillNotification.amount < 0 ? '-' : '+'}${Math.abs(skillNotification.amount).toLocaleString()}
+               </div>
+               <div className="text-2xl font-bold text-white uppercase tracking-widest bg-[#a855f7]/20 px-6 py-2 rounded-full border border-[#a855f7]/50 backdrop-blur-md">
+                  {skillNotification.message}
+               </div>
+            </div>
+         </div>
+      )}
       
       {/* PROFESSIONAL HEADER */}
       <header className="h-14 border-b border-[#1e293b] bg-[#0f172a] flex items-center px-4 justify-between sticky top-0 z-50">
@@ -476,7 +505,10 @@ export default function TradingInterface() {
       </header>
 
       {/* MAIN LAYOUT GRID */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden">
+        
+        {/* Top Section - Trading Area */}
+        <div className="flex-1 flex overflow-hidden">
         
         {/* LEFT COLUMN: Chart & History */}
         <div className="flex-1 flex flex-col min-w-0 border-r border-[#1e293b]">
@@ -777,6 +809,11 @@ export default function TradingInterface() {
                </div>
            </div>
         </div>
+        </div>
+        
+        {/* Bottom Section - Skills Panel (Full Width) */}
+        <SkillsPanel />
+        
       </div>
     </div>
   )

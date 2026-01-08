@@ -26,6 +26,27 @@ interface Bet {
   created_at: string
 }
 
+interface Skill {
+  id: string
+  name: string
+  description: string
+  skill_type: string
+  cooldown_rounds: number
+  parameters: {
+    min_steal_percentage?: number
+    max_steal_percentage?: number
+  }
+}
+
+interface UserSkill {
+  id: string
+  user_id: string
+  skill_id: string
+  last_used_round: number
+  is_active: boolean
+  skill?: Skill
+}
+
 interface AppState {
   user: User | null
   goldPrice: GoldPrice | null
@@ -46,9 +67,12 @@ interface AppState {
   isGameCompleted: boolean
   leaderboard: User[]
   maxRound: number | null
+  userSkills: UserSkill[]
+  skillNotification: { message: string; amount: number } | null
   setLastWinAmount: (amount: number | null) => void
   lastLossAmount: number | null
   setLastLossAmount: (amount: number | null) => void
+  setSkillNotification: (notification: { message: string; amount: number } | null) => void
   initializeUser: (name: string) => Promise<void>
   loadUser: () => Promise<void>
   placeBet: (prediction: 'up' | 'down', amount: number) => Promise<boolean>
@@ -63,6 +87,9 @@ interface AppState {
   loadPriceHistory: () => Promise<void>
   loadOnlineUsers: () => Promise<void>
   loadAllUsers: () => Promise<void>
+  loadUserSkills: () => Promise<void>
+  useSkill: (skillId: string, targetUserId: string, currentRound: number) => Promise<boolean>
+  subscribeToSkillUsage: () => void
 }
 
 let broadcastChannel: any = null
@@ -97,9 +124,12 @@ export const useStore = create<AppState>((set, get) => ({
   isGameCompleted: false,
   leaderboard: [],
   maxRound: null,
+  userSkills: [],
+  skillNotification: null,
 
   setLastWinAmount: (amount) => set({ lastWinAmount: amount }),
   setLastLossAmount: (amount) => set({ lastLossAmount: amount }),
+  setSkillNotification: (notification) => set({ skillNotification: notification }),
 
   loadUser: async () => {
     try {
@@ -850,7 +880,7 @@ export const useStore = create<AppState>((set, get) => ({
           table: 'users',
           filter: `id=eq.${currentUser.id}`,
         },
-        async (payload) => {
+        async (_payload) => {
           // User was deleted from database - log them out
           console.log('User deleted from database, logging out...')
           set({ 
@@ -975,6 +1005,142 @@ export const useStore = create<AppState>((set, get) => ({
       }
     } catch (error) {
       console.error('Failed to initialize user presence:', error)
+    }
+  },
+
+  loadUserSkills: async () => {
+    const { user } = get()
+    if (!user) return
+
+    try {
+      const { data, error } = await supabase
+        .from('user_skills')
+        .select(`
+          id,
+          user_id,
+          skill_id,
+          last_used_round,
+          is_active,
+          skill:skill_definitions (
+            id,
+            name,
+            description,
+            skill_type,
+            cooldown_rounds,
+            parameters
+          )
+        `)
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+
+      if (error) {
+        console.error('Error loading user skills:', error)
+        return
+      }
+
+      const skills = (data || []).map((item: any) => ({
+        ...item,
+        skill: Array.isArray(item.skill) ? item.skill[0] : item.skill
+      }))
+      set({ userSkills: skills })
+    } catch (error) {
+      console.error('Error loading user skills:', error)
+    }
+  },
+
+  useSkill: async (_skillId: string, targetUserId: string, currentRound: number) => {
+    const { user, loadUser } = get()
+    if (!user) {
+      toast.error('User not found')
+      return false
+    }
+
+    try {
+      const { data, error } = await supabase.rpc('use_steal_money_skill', {
+        p_user_id: user.id,
+        p_target_user_id: targetUserId,
+        p_current_round: currentRound,
+      })
+
+      if (error) {
+        console.error('Error using skill:', error)
+        toast.error(error.message || 'Failed to use skill')
+        return false
+      }
+
+      if (!data || !data.success) {
+        toast.error(data?.error || 'Failed to use skill')
+        return false
+      }
+
+      // Success!
+      const amount = data.amount
+      toast.success(`💰 Successfully stole $${amount.toLocaleString()} from target!`)
+      
+      // Reload user to get updated balance
+      await loadUser()
+      
+      return true
+    } catch (error: any) {
+      console.error('Error using skill:', error)
+      toast.error(error.message || 'Failed to use skill')
+      return false
+    }
+  },
+
+  subscribeToSkillUsage: () => {
+    const { user, setSkillNotification, loadUser } = get()
+    if (!user) return
+
+    console.log('Setting up skill usage subscription for user:', user.id)
+
+    // Subscribe to skill usage history to detect when user is targeted
+    const skillChannel = supabase
+      .channel('skill-usage')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'skill_usage_history',
+          filter: `target_user_id=eq.${user.id}`
+        },
+        async (payload: any) => {
+          console.log('Skill usage detected:', payload)
+          const usage = payload.new
+          
+          if (usage.result === 'success') {
+            // Show notification that money was stolen
+            const amount = usage.amount || 0
+            console.log('Money stolen from user:', amount)
+            
+            setSkillNotification({
+              message: `Someone stole money from you!`,
+              amount: -amount
+            })
+
+            // Show toast
+            toast.error(`💸 $${amount.toLocaleString()} was stolen from you!`, {
+              duration: 5000
+            })
+
+            // Reload user to get updated balance
+            await loadUser()
+
+            // Clear notification after 5 seconds
+            setTimeout(() => {
+              setSkillNotification(null)
+            }, 5000)
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('Skill usage subscription status:', status)
+      })
+
+    return () => {
+      console.log('Unsubscribing from skill usage')
+      skillChannel.unsubscribe()
     }
   },
 }))
