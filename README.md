@@ -2,6 +2,19 @@
 
 A real-time multiplayer forex trading game built with React, TypeScript, Supabase, and Tailwind CSS. Players can trade gold (XAU/USD) with real-time price updates.
 
+## ⚠️ IMPORTANT: Admin Panel Required
+
+**The admin panel MUST be open for the game to work!**
+
+- Admin panel acts as the central server broadcasting game state to all clients
+- Navigate to `?admin=true` and keep that tab open
+- If admin panel is closed, clients cannot play
+
+### How to Use:
+1. Open admin panel: `http://localhost:5173/?admin=true` (keep it open!)
+2. Enable "Auto" mode for automatic game progression
+3. Open client interface: `http://localhost:5173/` to play
+
 ## Features
 
 - 🎮 **Real-time Trading**: Buy and sell gold with live price updates

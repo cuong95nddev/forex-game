@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { Play, Pause, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react'
 
@@ -8,14 +8,21 @@ export default function AdminPanel() {
   const [isAutoMode, setIsAutoMode] = useState(false)
   const [autoInterval, setAutoInterval] = useState(15)
   const [currentRound, setCurrentRound] = useState<any>(null)
+  const [countdown, setCountdown] = useState(15)
   const [stats, setStats] = useState({
     totalRounds: 0,
     activePlayers: 0,
     totalBets: 0,
   })
+  const broadcastChannel = useRef<any>(null)
+  const countdownInterval = useRef<any>(null)
 
   useEffect(() => {
     const initialize = async () => {
+      // Setup broadcast channel
+      broadcastChannel.current = supabase.channel('game-state')
+      await broadcastChannel.current.subscribe()
+      
       await loadCurrentPrice()
       await loadCurrentRound()
       await loadStats()
@@ -29,22 +36,28 @@ export default function AdminPanel() {
       
       if (!activeRound) {
         console.log('No active round, starting first round...')
-        await startNewRound()
+        await startNewRound(currentPrice)
+      } else {
+        // Start countdown for existing round
+        startCountdownTimer(activeRound)
       }
     }
     
     initialize()
     
-    const interval = setInterval(() => {
-      loadCurrentRound()
+    const statsInterval = setInterval(() => {
       loadStats()
-    }, 1000)
+    }, 3000)
 
-    return () => clearInterval(interval)
+    return () => {
+      clearInterval(statsInterval)
+      if (countdownInterval.current) clearInterval(countdownInterval.current)
+      if (broadcastChannel.current) broadcastChannel.current.unsubscribe()
+    }
   }, [])
 
   useEffect(() => {
-    let interval: NodeJS.Timeout
+    let interval: ReturnType<typeof setInterval>
 
     if (isAutoMode) {
       interval = setInterval(() => {
@@ -84,6 +97,40 @@ export default function AdminPanel() {
     }
   }
 
+  const startCountdownTimer = (round: any) => {
+    if (countdownInterval.current) clearInterval(countdownInterval.current)
+    
+    const startTime = new Date(round.start_time).getTime()
+    const updateCountdown = () => {
+      const now = Date.now()
+      const elapsed = Math.floor((now - startTime) / 1000)
+      const remaining = Math.max(0, 15 - elapsed)
+      
+      setCountdown(remaining)
+      
+      // Broadcast game state to all clients
+      if (broadcastChannel.current) {
+        broadcastChannel.current.send({
+          type: 'broadcast',
+          event: 'game-state',
+          payload: {
+            countdown: remaining,
+            currentRound: round,
+            goldPrice: currentPrice
+          }
+        })
+      }
+      
+      if (remaining === 0) {
+        clearInterval(countdownInterval.current)
+        completeRound(round)
+      }
+    }
+    
+    updateCountdown()
+    countdownInterval.current = setInterval(updateCountdown, 1000)
+  }
+
   const loadCurrentRound = async () => {
     const { data } = await supabase
       .from('rounds')
@@ -94,16 +141,9 @@ export default function AdminPanel() {
       .single()
 
     setCurrentRound(data)
-
-    // Auto complete round after 15 seconds
+    
     if (data) {
-      const startTime = new Date(data.start_time).getTime()
-      const now = Date.now()
-      const elapsed = Math.floor((now - startTime) / 1000)
-
-      if (elapsed >= 15) {
-        await completeRound(data)
-      }
+      startCountdownTimer(data)
     }
   }
 
@@ -166,8 +206,9 @@ export default function AdminPanel() {
             (bet.prediction === 'down' && !priceWentUp)
 
           const result = userWon ? 'won' : 'lost'
-          const profit = userWon ? bet.bet_amount * 0.95 : -bet.bet_amount
-          const newBalance = bet.users.balance + profit
+          const profit = userWon ? bet.bet_amount * 0.95 : 0
+          // Winners get their bet back + profit, losers already lost their bet when placing it
+          const balanceChange = userWon ? bet.bet_amount + profit : 0
 
           // Update bet result
           await supabase
@@ -175,11 +216,14 @@ export default function AdminPanel() {
             .update({ result, profit })
             .eq('id', bet.id)
 
-          // Update user balance
-          await supabase
-            .from('users')
-            .update({ balance: newBalance })
-            .eq('id', bet.user_id)
+          // Update user balance if they won
+          if (userWon) {
+            const newBalance = bet.users.balance + balanceChange
+            await supabase
+              .from('users')
+              .update({ balance: newBalance })
+              .eq('id', bet.user_id)
+          }
         }
       }
 
@@ -200,7 +244,7 @@ export default function AdminPanel() {
 
     const newRoundNumber = (lastRound?.round_number || 0) + 1
 
-    await supabase
+    const { data: newRound } = await supabase
       .from('rounds')
       .insert({
         round_number: newRoundNumber,
@@ -208,6 +252,13 @@ export default function AdminPanel() {
         start_time: new Date().toISOString(),
         status: 'active',
       })
+      .select()
+      .single()
+
+    if (newRound) {
+      setCurrentRound(newRound)
+      startCountdownTimer(newRound)
+    }
   }
 
   const handleAutoUpdatePrice = async () => {
@@ -237,6 +288,19 @@ export default function AdminPanel() {
       setCurrentPrice(price)
       setPriceChange(change)
 
+      // Broadcast price update
+      if (broadcastChannel.current && currentRound) {
+        broadcastChannel.current.send({
+          type: 'broadcast',
+          event: 'game-state',
+          payload: {
+            countdown,
+            currentRound,
+            goldPrice: price
+          }
+        })
+      }
+
       // Check if we need to start a new round
       if (!currentRound) {
         await startNewRound(price)
@@ -261,9 +325,26 @@ export default function AdminPanel() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-8">
       <div className="max-w-6xl mx-auto">
+        {/* Warning Banner */}
+        <div className="bg-yellow-500/20 border-2 border-yellow-500 rounded-lg p-4 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="text-2xl">⚠️</div>
+            <div>
+              <div className="font-bold text-yellow-400">QUAN TRỌNG: Trang này phải được mở để game hoạt động!</div>
+              <div className="text-sm text-gray-300 mt-1">
+                Admin panel đang phát sóng trực tiếp trạng thái game đến tất cả người chơi. Nếu đóng trang này, người chơi sẽ không thể tiếp tục chơi.
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold">Admin Control Panel</h1>
           <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="text-sm text-gray-300">Broadcasting Live</span>
+            </div>
             <button
               onClick={() => setIsAutoMode(!isAutoMode)}
               className={`px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2 ${
@@ -319,7 +400,7 @@ export default function AdminPanel() {
               <div>
                 <div className="text-gray-400 text-sm">Thời gian còn lại</div>
                 <div className="text-2xl font-bold text-yellow-400">
-                  {Math.max(0, 15 - Math.floor((Date.now() - new Date(currentRound.start_time).getTime()) / 1000))}s
+                  {countdown}s
                 </div>
               </div>
             </div>

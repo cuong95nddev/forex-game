@@ -5,7 +5,7 @@ import AdminPanel from './components/AdminPanel'
 import { useStore } from './store/useStore'
 
 function App() {
-  const { user, loading, loadUser, initializeUser, subscribeToGoldPrice, subscribeToRounds } = useStore()
+  const { user, loading, loadUser, initializeUser, subscribeToGoldPrice, subscribeToBroadcast, subscribeToRounds } = useStore()
   const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
@@ -14,12 +14,13 @@ function App() {
     
     // Subscribe to real-time updates
     subscribeToGoldPrice()
+    subscribeToBroadcast()
     subscribeToRounds()
     
     // Check if admin mode is enabled via URL
     const params = new URLSearchParams(window.location.search)
     setIsAdmin(params.get('admin') === 'true')
-  }, [loadUser, subscribeToGoldPrice, subscribeToRounds])
+  }, [loadUser, subscribeToGoldPrice, subscribeToBroadcast, subscribeToRounds])
 
   console.log('App render:', { user, loading, isAdmin })
 

@@ -36,11 +36,13 @@ interface AppState {
   loadUser: () => Promise<void>
   placeBet: (prediction: 'up' | 'down', amount: number) => Promise<boolean>
   subscribeToGoldPrice: () => void
+  subscribeToBroadcast: () => void
   subscribeToRounds: () => void
   loadRecentBets: () => Promise<void>
 }
 
 let countdownInterval: NodeJS.Timeout | null = null
+let broadcastChannel: any = null
 
 export const useStore = create<AppState>((set, get) => ({
   user: null,
@@ -96,21 +98,12 @@ export const useStore = create<AppState>((set, get) => ({
       if (roundData) {
         set({ currentRound: roundData })
         
-        // Calculate countdown
+        // Calculate initial countdown
         const startTime = new Date(roundData.start_time).getTime()
         const now = Date.now()
         const elapsed = Math.floor((now - startTime) / 1000)
         const remaining = Math.max(0, 15 - elapsed)
         set({ countdown: remaining })
-
-        // Start countdown timer
-        if (countdownInterval) clearInterval(countdownInterval)
-        countdownInterval = setInterval(() => {
-          const currentCountdown = get().countdown
-          if (currentCountdown > 0) {
-            set({ countdown: currentCountdown - 1 })
-          }
-        }, 1000)
 
         // Check if user has bet in this round
         if (userData) {
@@ -241,6 +234,27 @@ export const useStore = create<AppState>((set, get) => ({
       })
   },
 
+  subscribeToBroadcast: () => {
+    console.log('Setting up broadcast subscription...')
+    
+    broadcastChannel = supabase.channel('game-state')
+    
+    broadcastChannel
+      .on('broadcast', { event: 'game-state' }, (payload: any) => {
+        console.log('📡 Broadcast received:', payload)
+        const { countdown, currentRound, goldPrice } = payload.payload
+        
+        set({ 
+          countdown,
+          currentRound,
+          goldPrice: goldPrice ? { price: goldPrice, change: 0, timestamp: new Date().toISOString() } : get().goldPrice
+        })
+      })
+      .subscribe((status) => {
+        console.log('Broadcast subscription status:', status)
+      })
+  },
+
   loadRecentBets: async () => {
     try {
       const { data } = await supabase
@@ -276,15 +290,6 @@ export const useStore = create<AppState>((set, get) => ({
             userBet: null,
             countdown: 15
           })
-
-          // Start countdown
-          if (countdownInterval) clearInterval(countdownInterval)
-          countdownInterval = setInterval(() => {
-            const currentCountdown = get().countdown
-            if (currentCountdown > 0) {
-              set({ countdown: currentCountdown - 1 })
-            }
-          }, 1000)
         }
       )
       .on(
