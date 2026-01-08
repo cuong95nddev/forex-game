@@ -1,16 +1,15 @@
 import { useEffect, useState, useRef } from 'react'
-import { TrendingUp, TrendingDown, Clock, DollarSign, Users, Database } from 'lucide-react'
+import { TrendingUp, TrendingDown, Clock, DollarSign, Users } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import TradingChart from './TradingChart'
 import { toast } from 'sonner'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Separator } from '@/components/ui/separator'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Progress } from '@/components/ui/progress'
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export default function TradingInterface() {
   const { 
@@ -67,6 +66,7 @@ export default function TradingInterface() {
       lastBalanceRef.current = user.balance
     }
   }, [user?.balance])
+
   useEffect(() => {
     loadRecentBets()
     loadPriceHistory()
@@ -93,7 +93,7 @@ export default function TradingInterface() {
   
   // Update chart in real-time as goldPrice changes
   useEffect(() => {
-    if (goldPrice && currentRound) {
+    if (goldPrice) {
       setChartPrices(prev => {
         const newPoint = {
           time: new Date(goldPrice.timestamp).getTime() / 1000,
@@ -103,8 +103,8 @@ export default function TradingInterface() {
         // Add new price point
         const updated = [...prev, newPoint]
         
-        // Keep only prices from current round (or last 50 points)
-        const maxPoints = 50
+        // Keep last 300 points (approx 10 mins) for better history context
+        const maxPoints = 300
         if (updated.length > maxPoints) {
           return updated.slice(-maxPoints)
         }
@@ -112,19 +112,7 @@ export default function TradingInterface() {
         return updated
       })
     }
-  }, [goldPrice, currentRound])
-
-  // Show loading state if no user or goldPrice
-  if (!user || !goldPrice) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-xl">Đang tải dữ liệu...</p>
-        </div>
-      </div>
-    )
-  }
+  }, [goldPrice])
 
   const handleBet = async (prediction: 'up' | 'down') => {
     const amount = parseFloat(betAmount)
@@ -140,18 +128,16 @@ export default function TradingInterface() {
 
     const success = await placeBet(prediction, amount)
     if (success) {
-      setBetAmount('100')
+      // Don't reset bet amount, keep it for fast trading
     }
   }
 
   if (!user || !goldPrice) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen bg-[#0b0f13] flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-xl">Đang tải dữ liệu...</p>
-          {!user && <p className="text-muted-foreground mt-2">Đang tải thông tin người dùng...</p>}
-          {!goldPrice && <p className="text-muted-foreground mt-2">Đang tải giá vàng...</p>}
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#f59e0b] mx-auto mb-4"></div>
+          <p className="text-[#94a3b8]">Đang kết nối thị trường...</p>
         </div>
       </div>
     )
@@ -160,324 +146,316 @@ export default function TradingInterface() {
   const priceChange = goldPrice?.change || 0
   const priceChangePercent = goldPrice ? ((priceChange / goldPrice.price) * 100).toFixed(2) : '0.00'
   const isPositive = priceChange >= 0
+  const quickAmounts = [100, 500, 1000, 5000, 10000, 50000]
 
-  const quickAmounts = [100, 500, 1000, 5000]
   return (
-    <div className="min-h-screen bg-background">
-      {/* Top Bar */}
-      <Card className="rounded-none border-x-0 border-t-0 bg-gradient-to-r from-card via-card/95 to-card border-b-2 border-b-primary/20 shadow-lg">
-        <CardContent className="p-4">
-          <div className="flex justify-between items-center max-w-[1800px] mx-auto">
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#f59e0b] via-[#d97706] to-[#b45309] flex items-center justify-center shadow-xl glow-gold">
-                  <DollarSign size={28} className="text-white font-bold" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-[#f59e0b] to-[#fbbf24] bg-clip-text text-transparent">GOLD TRADE</h1>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider">XAU/USD Trading Platform</p>
-                </div>
-                <Badge className="animate-pulse ml-2 bg-red-600 hover:bg-red-600 text-white font-bold px-3 py-1 shadow-lg">
-                  ● LIVE
-                </Badge>
-              </div>
-              <Separator orientation="vertical" className="h-10 bg-border" />
-              <div className="flex items-center gap-2 bg-card/30 px-3 py-2 rounded-lg border border-border/50">
-                <Users size={18} className="text-primary" />
-                <span className="text-sm font-medium text-muted-foreground">Online:</span>
-                <Badge variant="outline" className="bg-primary/15 text-primary border-primary/40 font-bold text-base px-2.5">
-                  {onlineUsers}
-                </Badge>
-              </div>
+    <div className="min-h-screen bg-[#0b0f13] text-foreground flex flex-col font-sans">
+      
+      {/* PROFESSIONAL HEADER */}
+      <header className="h-14 border-b border-[#1e293b] bg-[#0f172a] flex items-center px-4 justify-between sticky top-0 z-50">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#f59e0b] to-[#b45309] flex items-center justify-center shadow-lg">
+              <DollarSign size={18} className="text-white font-bold" />
+            </div>
+            <span className="text-xl font-bold tracking-tight text-white">PRO<span className="text-[#f59e0b]">TRADE</span></span>
+          </div>
+          
+          <div className="hidden md:flex items-center gap-4 border-l border-[#1e293b] pl-6 text-sm">
+            <div className="flex flex-col">
+              <span className="text-[#94a3b8] text-[10px] uppercase font-bold tracking-wider">Symbol</span>
+              <span className="font-bold text-white flex items-center gap-1">
+                XAU/USD <span className="bg-[#f59e0b] text-black text-[10px] px-1 rounded font-extrabold">GOLD</span>
+              </span>
             </div>
             
-            <div className="flex items-center gap-4">
-              <div className={`text-right bg-gradient-to-br from-card to-card/50 px-6 py-3 rounded-xl border-2 border-[#f59e0b]/30 shadow-xl glow-gold transition-all duration-300 ${
-                balanceFlash ? 'scale-105 ring-4 ring-[#f59e0b]/50' : ''
+            <div className="flex flex-col min-w-[100px]">
+              <span className="text-[#94a3b8] text-[10px] uppercase font-bold tracking-wider">Price</span>
+              <span className={`font-mono font-bold text-base transition-colors duration-200 ${
+                  priceFlash === 'up' ? 'text-[#10b981]' : 
+                  priceFlash === 'down' ? 'text-[#ef4444]' : 'text-white'
               }`}>
-                <div className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-1">Số Dư Tài Khoản</div>
-                <div className={`text-2xl font-bold flex items-center gap-1.5 bg-gradient-to-r from-[#f59e0b] to-[#fbbf24] bg-clip-text text-transparent transition-all duration-300 ${
-                  balanceFlash ? 'scale-110' : ''
-                }`}>
-                  <DollarSign size={24} className="text-[#f59e0b]" />
-                  {user?.balance.toLocaleString()} ₫
-                </div>
+                {goldPrice?.price.toFixed(2)}
+              </span>
+            </div>
+            
+            <div className="flex flex-col">
+              <span className="text-[#94a3b8] text-[10px] uppercase font-bold tracking-wider">Change</span>
+              <div className={`flex items-center text-xs font-bold ${isPositive ? 'text-[#10b981]' : 'text-[#ef4444]'}`}>
+                {isPositive ? <TrendingUp size={12} className="mr-1"/> : <TrendingDown size={12} className="mr-1"/>}
+                {isPositive ? '+' : ''}{priceChange.toFixed(2)} ({isPositive ? '+' : ''}{priceChangePercent}%)
               </div>
-              <Avatar className="h-12 w-12 ring-2 ring-primary/40 shadow-lg">
-                <AvatarFallback className="font-bold bg-gradient-to-br from-primary/30 to-primary/20 text-primary text-lg">
-                  {user?.name[0].toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      <div className="max-w-[1800px] mx-auto p-6">
-        <div className="grid grid-cols-12 gap-6">
-          {/* Main Chart Area */}
-          <div className="col-span-9 space-y-4">
-            {/* Price Header */}
-            <Card className="bg-gradient-to-br from-card via-card/95 to-card/90 border-2 border-border shadow-2xl">
-              <CardContent className="p-8">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardDescription className="mb-3 text-sm font-bold uppercase tracking-widest text-[#f59e0b]">XAU/USD - Gold Spot Price</CardDescription>
-                    <div className="flex items-center gap-4">
-                      <div className={`text-4xl font-bold transition-all duration-300 tabular-nums ${
-                        priceFlash === 'up' ? 'scale-110 text-[#10b981] drop-shadow-[0_0_15px_rgba(16,185,129,0.5)]' : 
-                        priceFlash === 'down' ? 'scale-110 text-[#ef4444] drop-shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'text-foreground'
-                      }`}>
-                        ${goldPrice?.price.toFixed(2) || '0.00'}
-                      </div>
-                      <Badge 
-                        className={`flex items-center gap-2 px-4 py-2 text-base font-bold shadow-2xl border-2 ${
-                          isPositive 
-                            ? 'bg-[#10b981] hover:bg-[#10b981] border-[#10b981]/50 glow-green' 
-                            : 'bg-[#ef4444] hover:bg-[#ef4444] border-[#ef4444]/50 glow-red'
-                        } ${
-                          priceFlash ? 'animate-pulse' : ''
-                        }`}
-                      >
-                        {isPositive ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
-                        <span className="font-extrabold">
-                          {isPositive ? '+' : ''}{priceChange.toFixed(2)} ({isPositive ? '+' : ''}{priceChangePercent}%)
-                        </span>
-                      </Badge>
-                    </div>
-                  </div>
-                  
-                  <div className="text-right">
-                    <CardDescription className="mb-3 text-sm font-bold uppercase tracking-widest text-primary">Thời Gian Còn Lại</CardDescription>
-                    <div className="flex flex-col items-end gap-3">
-                      <div className={`flex items-center gap-3 px-4 py-2 rounded-xl ${
-                        countdown <= 5 ? 'bg-destructive/20 border-2 border-destructive/50' : 'bg-primary/10 border-2 border-primary/30'
-                      }`}>
-                        <Clock size={24} className={countdown <= 5 ? 'text-destructive' : 'text-primary'} />
-                        <span className={`text-3xl font-bold tabular-nums ${
-                          countdown <= 5 ? 'animate-pulse text-destructive drop-shadow-[0_0_10px_rgba(239,68,68,0.5)]' : 'text-primary'
-                        }`}>
-                          {countdown}s
-                        </span>
-                      </div>
-                      <Progress 
-                        value={(countdown / 15) * 100} 
-                        className={`w-48 h-4 ${
-                          countdown <= 5 ? 'bg-destructive/20' : 'bg-primary/20'
-                        }`} 
-                      />
-                    </div>
-                  </div>
+        <div className="flex items-center gap-4">
+          <div className={`hidden md:flex flex-col items-end mr-4 transition-transform duration-200 ${balanceFlash ? 'scale-105' : ''}`}>
+            <span className="text-[#94a3b8] text-[10px] uppercase font-bold tracking-wider">Available Balance</span>
+            <div className="text-[#f59e0b] font-mono font-bold text-lg flex items-center gap-1">
+              ${user.balance.toLocaleString()}
+            </div>
+          </div>
+          
+          <div className="h-8 w-[1px] bg-[#1e293b] hidden md:block"></div>
+          
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 bg-[#1e293b] px-3 py-1 rounded-full border border-[#334155]">
+              <Users size={14} className="text-[#94a3b8]" />
+              <span className="text-xs font-bold text-[#94a3b8]">{onlineUsers}</span>
+            </div>
+            <Avatar className="h-9 w-9 border-2 border-[#1e293b]">
+              <AvatarFallback className="bg-[#1e293b] text-[#f59e0b] font-bold">
+                {user.name[0].toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+          </div>
+        </div>
+      </header>
+
+      {/* MAIN LAYOUT GRID */}
+      <div className="flex-1 flex overflow-hidden">
+        
+        {/* LEFT COLUMN: Chart & History */}
+        <div className="flex-1 flex flex-col min-w-0 border-r border-[#1e293b]">
+          
+          {/* Chart Section - Takes available height */}
+          <div className="flex-1 relative bg-[#0b0f13]">
+             {/* Chart Overlay Info */}
+             <div className="absolute top-4 left-4 z-10 flex gap-4 pointer-events-none">
+                <div className="bg-[#1e293b]/80 backdrop-blur-sm border border-[#334155] rounded-md px-3 py-2">
+                   <div className="text-[10px] text-[#94a3b8] uppercase font-bold">Round ID</div>
+                   <div className="text-white font-mono font-bold">#{currentRound?.round_number || '---'}</div>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="bg-[#1e293b]/80 backdrop-blur-sm border border-[#334155] rounded-md px-3 py-2">
+                   <div className="text-[10px] text-[#94a3b8] uppercase font-bold">Time Left</div>
+                   <div className={`font-mono font-bold text-lg flex items-center gap-2 ${
+                     countdown <= 5 ? 'text-[#ef4444] animate-pulse' : 'text-[#f59e0b]'
+                   }`}>
+                     <Clock size={16} />
+                     {countdown}s
+                   </div>
+                </div>
+             </div>
+             
+             <TradingChart prices={chartPrices} />
+          </div>
 
-            {/* Chart */}
-            <Card className="bg-gradient-to-br from-card to-card/80 border-2 border-border/50 shadow-xl">
-              <CardContent className="p-6">
-                <TradingChart prices={chartPrices} />
-              </CardContent>
-            </Card>
+          {/* Bottom Tabs: Positions / History */}
+          <div className="h-[300px] bg-[#0f172a] border-t border-[#1e293b] flex flex-col">
+            <Tabs defaultValue="positions" className="w-full flex flex-col h-full">
+              <div className="px-4 border-b border-[#1e293b] flex items-center justify-between bg-[#1e293b]/30">
+                <TabsList className="bg-transparent h-10 p-0">
+                  <TabsTrigger value="positions" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-[#f59e0b] data-[state=active]:text-[#f59e0b] rounded-none px-4 h-full border-b-2 border-transparent text-[#94a3b8] font-bold text-xs uppercase tracking-wider">
+                    Recent Positions
+                  </TabsTrigger>
+                  <TabsTrigger value="market" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-[#f59e0b] data-[state=active]:text-[#f59e0b] rounded-none px-4 h-full border-b-2 border-transparent text-[#94a3b8] font-bold text-xs uppercase tracking-wider">
+                    Market Activity
+                  </TabsTrigger>
+                </TabsList>
+              </div>
 
-            {/* Recent Bets Table */}
-            <Card className="bg-gradient-to-br from-card to-card/80 border-2 border-border/50 shadow-xl">
-              <CardHeader className="bg-card/50 border-b border-border/50">
-                <CardTitle className="text-xl font-bold uppercase tracking-wider flex items-center gap-2">
-                  <Database size={20} className="text-primary" />
-                  Lệnh Gần Đây
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Thời gian</TableHead>
-                      <TableHead>Người chơi</TableHead>
-                      <TableHead>Dự đoán</TableHead>
-                      <TableHead className="text-right">Số tiền</TableHead>
-                      <TableHead className="text-right">Kết quả</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {recentBets.slice(0, 10).map((bet) => (
-                      <TableRow key={bet.id}>
-                        <TableCell>
-                          {new Date(bet.created_at).toLocaleTimeString('vi-VN')}
-                        </TableCell>
-                        <TableCell>User-{bet.user_id.slice(0, 8)}</TableCell>
-                        <TableCell>
-                          <Badge 
-                            variant={bet.prediction === 'up' ? 'default' : 'destructive'}
-                          >
-                            {bet.prediction === 'up' ? '↑ TĂNG' : '↓ GIẢM'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right font-medium">${bet.bet_amount.toLocaleString()}</TableCell>
-                        <TableCell className="text-right">
-                          {bet.result === 'pending' ? (
-                            <Badge variant="outline">Chờ</Badge>
-                          ) : bet.result === 'won' ? (
-                            <span className="font-semibold">+${bet.profit.toLocaleString()}</span>
-                          ) : (
-                            <span className="font-semibold">-${bet.bet_amount.toLocaleString()}</span>
-                          )}
-                        </TableCell>
+              <TabsContent value="positions" className="flex-1 p-0 m-0 overflow-hidden">
+                <ScrollArea className="h-full w-full">
+                  <Table>
+                    <TableHeader className="bg-[#0f172a] sticky top-0 z-10">
+                      <TableRow className="hover:bg-transparent border-b border-[#1e293b]">
+                        <TableHead className="text-[#94a3b8] text-[10px] uppercase h-8">Time</TableHead>
+                        <TableHead className="text-[#94a3b8] text-[10px] uppercase h-8">Type</TableHead>
+                        <TableHead className="text-[#94a3b8] text-[10px] uppercase h-8 text-right">Amount</TableHead>
+                        <TableHead className="text-[#94a3b8] text-[10px] uppercase h-8 text-right">Payout</TableHead>
+                        <TableHead className="text-[#94a3b8] text-[10px] uppercase h-8 text-right">Status</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </div>
+                    </TableHeader>
+                    <TableBody>
+                        {recentBets.filter(b => b.user_id === user.id).slice(0, 20).map((bet) => (
+                           <TableRow key={bet.id} className="border-[#1e293b] hover:bg-[#1e293b]/50 transition-colors">
+                              <TableCell className="py-2 text-xs font-mono text-[#94a3b8]">
+                                {new Date(bet.created_at).toLocaleTimeString()}
+                              </TableCell>
+                              <TableCell className="py-2">
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                                  bet.prediction === 'up' ? 'bg-[#10b981]/20 text-[#10b981]' : 'bg-[#ef4444]/20 text-[#ef4444]'
+                                }`}>
+                                  {bet.prediction === 'up' ? 'BUY / UP' : 'SELL / DOWN'}
+                                </span>
+                              </TableCell>
+                              <TableCell className="py-2 text-right text-xs font-mono font-medium">
+                                ${bet.bet_amount.toLocaleString()}
+                              </TableCell>
+                              <TableCell className="py-2 text-right text-xs font-mono font-medium">
+                                {bet.result === 'won' ? (
+                                  <span className="text-[#10b981]">+{bet.profit.toLocaleString()}</span>
+                                ) : bet.result === 'lost' ? (
+                                  <span className="text-[#ef4444]">-{bet.bet_amount.toLocaleString()}</span>
+                                ) : (
+                                  <span className="text-[#94a3b8]">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="py-2 text-right">
+                                {bet.result === 'pending' ? (
+                                  <Badge variant="outline" className="border-[#f59e0b] text-[#f59e0b] text-[10px] py-0 h-5">PENDING</Badge>
+                                ) : bet.result === 'won' ? (
+                                  <Badge variant="outline" className="border-[#10b981] bg-[#10b981]/10 text-[#10b981] text-[10px] py-0 h-5">WIN</Badge>
+                                ) : (
+                                  <Badge variant="outline" className="border-[#ef4444] bg-[#ef4444]/10 text-[#ef4444] text-[10px] py-0 h-5">LOSS</Badge>
+                                )}
+                              </TableCell>
+                           </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
+              </TabsContent>
 
-          {/* Trading Panel */}
-          <div className="col-span-3">
-            <Card className="sticky top-6 bg-gradient-to-br from-card via-card to-card/90 border-2 border-[#f59e0b]/30 shadow-2xl glow-gold">
-              <CardHeader className="text-center border-b-2 border-[#f59e0b]/30 bg-gradient-to-br from-card to-card/50">
-                <CardTitle className="text-2xl font-extrabold uppercase tracking-widest bg-gradient-to-r from-[#f59e0b] to-[#fbbf24] bg-clip-text text-transparent">
-                  ĐẶT LỆNH NGAY
-                </CardTitle>
-                <CardDescription className="text-xs uppercase tracking-wider font-semibold mt-1">Trading Panel</CardDescription>
-              </CardHeader>
-              <CardContent className="p-6">
-                {/* Current Round Info */}
-                {currentRound && (
-                  <Card className="mb-6 bg-gradient-to-br from-primary/15 to-primary/5 border-2 border-primary/40 shadow-lg glow-green">
-                    <CardContent className="p-5 text-center">
-                      <CardDescription className="mb-2 uppercase text-xs tracking-widest font-bold text-primary">Vòng Hiện Tại</CardDescription>
-                      <div className="text-5xl font-extrabold text-primary drop-shadow-[0_0_10px_rgba(16,185,129,0.3)]">
-                        #{currentRound.round_number}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {userBet ? (
-                  <div className="space-y-4">
-                    <Card className={`border-3 shadow-xl ${
-                      userBet.prediction === 'up' 
-                        ? 'border-[#10b981] bg-gradient-to-br from-[#10b981]/10 to-[#10b981]/5 glow-green' 
-                        : 'border-[#ef4444] bg-gradient-to-br from-[#ef4444]/10 to-[#ef4444]/5 glow-red'
-                    }`}>
-                      <CardContent className="p-6 text-center">
-                        <CardDescription className="mb-3 uppercase text-xs tracking-widest font-bold">Lệnh Của Bạn</CardDescription>
-                        <Badge 
-                          className={`text-xl px-6 py-3 mb-4 font-extrabold shadow-xl border-2 ${
-                            userBet.prediction === 'up' 
-                              ? 'bg-gradient-to-br from-[#10b981] to-[#059669] hover:bg-[#10b981] border-[#10b981]/50' 
-                              : 'bg-gradient-to-br from-[#ef4444] to-[#dc2626] hover:bg-[#ef4444] border-[#ef4444]/50'
-                          }`}
-                        >
-                          {userBet.prediction === 'up' ? '↑ TĂNG' : '↓ GIẢM'}
-                        </Badge>
-                        <div className={`text-2xl font-extrabold mb-2 ${
-                          userBet.prediction === 'up' ? 'text-[#10b981]' : 'text-[#ef4444]'
-                        }`}>
-                          ${userBet.bet_amount.toLocaleString()}
-                        </div>
-                        <CardDescription className="mt-3 text-sm font-semibold">
-                          ⏳ Chờ kết quả vòng này...
-                        </CardDescription>
-                      </CardContent>
-                    </Card>
-                    <p className="text-center text-sm text-muted-foreground">
-                      Mỗi vòng chỉ được đặt 1 lần
-                    </p>
-                  </div>
-                ) : countdown > 0 && countdown >= 3 ? (
-                  <div className="space-y-4">
-                    {/* Bet Amount */}
-                    <div>
-                      <label className="block text-sm text-muted-foreground mb-2 font-medium">
-                        Số tiền cược
-                      </label>
-                      <Input
-                        type="number"
-                        value={betAmount}
-                        onChange={(e) => setBetAmount(e.target.value)}
-                        className="text-lg font-semibold"
-                        placeholder="Nhập số tiền"
-                      />
-                    </div>
-
-                    {/* Quick Amount Buttons */}
-                    <div className="grid grid-cols-2 gap-2">
-                      {quickAmounts.map((amount) => (
-                        <Button
-                          key={amount}
-                          onClick={() => setBetAmount(amount.toString())}
-                          variant="outline"
-                        >
-                          ${amount}
-                        </Button>
+              <TabsContent value="market" className="flex-1 p-0 m-0 overflow-hidden">
+                 <ScrollArea className="h-full w-full">
+                  <Table>
+                    <TableHeader className="bg-[#0f172a] sticky top-0 z-10">
+                      <TableRow className="hover:bg-transparent border-b border-[#1e293b]">
+                        <TableHead className="text-[#94a3b8] text-[10px] uppercase h-8">Time</TableHead>
+                        <TableHead className="text-[#94a3b8] text-[10px] uppercase h-8">User</TableHead>
+                        <TableHead className="text-[#94a3b8] text-[10px] uppercase h-8">Side</TableHead>
+                        <TableHead className="text-[#94a3b8] text-[10px] uppercase h-8 text-right">Amount</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {recentBets.slice(0, 20).map((bet) => (
+                        <TableRow key={bet.id} className="border-[#1e293b] hover:bg-[#1e293b]/50">
+                          <TableCell className="py-2 text-xs font-mono text-[#94a3b8]">
+                            {new Date(bet.created_at).toLocaleTimeString()}
+                          </TableCell>
+                          <TableCell className="py-2 text-xs text-[#e2e8f0]">
+                            User {bet.user_id.slice(0,4)}
+                          </TableCell>
+                          <TableCell className="py-2">
+                             <span className={`text-[10px] font-bold ${
+                                bet.prediction === 'up' ? 'text-[#10b981]' : 'text-[#ef4444]'
+                             }`}>
+                                {bet.prediction === 'up' ? 'UP' : 'DOWN'}
+                             </span>
+                          </TableCell>
+                          <TableCell className="py-2 text-right text-xs font-mono text-[#e2e8f0]">
+                            ${bet.bet_amount.toLocaleString()}
+                          </TableCell>
+                        </TableRow>
                       ))}
-                    </div>
-
-                    {/* Bet Buttons */}
-                    <div className="grid grid-cols-2 gap-4 mt-6">
-                      <Button
-                        onClick={() => handleBet('up')}
-                        disabled={!currentRound || countdown <= 0 || countdown < 3}
-                        className="h-24 flex flex-col gap-2 bg-gradient-to-br from-[#10b981] to-[#059669] hover:from-[#059669] hover:to-[#047857] text-white font-extrabold shadow-2xl border-3 border-[#10b981]/50 transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed glow-green"
-                      >
-                        <TrendingUp size={28} strokeWidth={3} />
-                        <span className="text-xl font-extrabold tracking-wide">TĂNG</span>
-                        <span className="text-sm opacity-95 font-bold bg-white/20 px-3 py-1 rounded-full">x{(1 + winRate).toFixed(2)}</span>
-                      </Button>
-                      
-                      <Button
-                        onClick={() => handleBet('down')}
-                        disabled={!currentRound || countdown <= 0 || countdown < 3}
-                        className="h-24 flex flex-col gap-2 bg-gradient-to-br from-[#ef4444] to-[#dc2626] hover:from-[#dc2626] hover:to-[#b91c1c] text-white font-extrabold shadow-2xl border-3 border-[#ef4444]/50 transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed glow-red"
-                      >
-                        <TrendingDown size={28} strokeWidth={3} />
-                        <span className="text-xl font-extrabold tracking-wide">GIẢM</span>
-                        <span className="text-sm opacity-95 font-bold bg-white/20 px-3 py-1 rounded-full">x{(1 + winRate).toFixed(2)}</span>
-                      </Button>
-                    </div>
-
-                    <div className="text-xs text-center text-muted-foreground mt-4 space-y-1">
-                      <p>Đặt lệnh trước khi hết thời gian</p>
-                      <p className="font-medium">
-                        🏆 Thắng nhận: x{(1 + winRate).toFixed(2)} (Đặt $100 → Nhận ${(100 * (1 + winRate)).toFixed(0)})
-                      </p>
-                    </div>
-                  </div>
-                ) : countdown > 0 && countdown < 3 ? (
-                  <div className="text-center py-8">
-                    <div className="text-4xl mb-2">⏳</div>
-                    <CardDescription className="text-lg font-semibold">Chờ kết quả vòng này...</CardDescription>
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <div className="text-4xl mb-2">⏳</div>
-                    <CardDescription>Đang chờ vòng mới...</CardDescription>
-                  </div>
-                )}
-
-                {/* Info */}
-                <Separator className="my-6" />
-                <div className="space-y-3 text-sm">
-                  <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Mỗi vòng:</span>
-                    <Badge variant="outline">15 giây</Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Thắng:</span>
-                    <Badge>
-                      x{(1 + winRate).toFixed(2)} tiền cược
-                    </Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Thua:</span>
-                    <Badge variant="destructive">
-                      Mất tiền cược
-                    </Badge>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
+              </TabsContent>
+            </Tabs>
           </div>
+        </div>
+
+        {/* RIGHT COLUMN: Trading Panel */}
+        <div className="w-[320px] bg-[#0f172a] border-l border-[#1e293b] flex flex-col z-20 shadow-xl">
+           
+           <div className="p-4 border-b border-[#1e293b] bg-[#1e293b]/20">
+              <h2 className="text-sm font-bold text-white uppercase tracking-widest mb-1">Place Order</h2>
+              <div className="text-[10px] text-[#94a3b8] flex justify-between">
+                <span>Wallet Balance</span>
+                <span className="text-[#f59e0b] font-mono">${user.balance.toLocaleString()}</span>
+              </div>
+           </div>
+
+           <div className="p-4 flex-1 overflow-y-auto">
+              {/* Amount Input */}
+              <div className="space-y-4 mb-6">
+                 <div>
+                    <label className="text-[11px] font-bold text-[#94a3b8] uppercase mb-1.5 block">Amount</label>
+                    <div className="relative">
+                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94a3b8]">$</span>
+                       <Input 
+                          type="number" 
+                          value={betAmount || ''}
+                          onChange={(e) => setBetAmount(e.target.value)}
+                          className="bg-[#0b0f13] border-[#334155] text-white pl-7 font-mono font-bold text-lg h-12 focus-visible:ring-1 focus-visible:ring-[#f59e0b] focus-visible:border-[#f59e0b]"
+                          placeholder="0.00"
+                        />
+                    </div>
+                 </div>
+
+                 <div className="grid grid-cols-4 gap-2">
+                    {quickAmounts.map(amt => (
+                       <button
+                          key={amt}
+                          onClick={() => setBetAmount(amt.toString())}
+                          className="bg-[#1e293b] hover:bg-[#334155] text-[#94a3b8] hover:text-white text-xs font-bold py-1.5 rounded transition-colors border border-[#334155]"
+                       >
+                          {amt >= 1000 ? `${amt/1000}k` : amt}
+                       </button>
+                    ))}
+                 </div>
+              </div>
+
+              {/* Profit Info */}
+              <div className="bg-[#1e293b]/50 rounded-lg p-3 border border-[#334155] mb-6">
+                 <div className="flex justify-between text-xs mb-1">
+                    <span className="text-[#94a3b8]">Payout</span>
+                    <span className="text-[#10b981] font-bold">{(1 + winRate) * 100}%</span>
+                 </div>
+                 <div className="flex justify-between text-xs">
+                    <span className="text-[#94a3b8]">Profit</span>
+                    <span className="text-[#10b981] font-bold">+${(parseFloat(betAmount || '0') * winRate).toLocaleString()}</span>
+                 </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-3">
+                 <Button
+                    onClick={() => handleBet('up')}
+                    disabled={!!userBet || !currentRound || countdown < 3}
+                    className="w-full h-14 bg-[#10b981] hover:bg-[#059669] text-white font-bold text-lg rounded-md shadow-[0_4px_0_0_#065f46] active:shadow-none active:translate-y-[4px] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                 >
+                    <div className="flex items-center gap-2">
+                       <TrendingUp className="stroke-[3px]" />
+                       <span>HIGHER</span>
+                    </div>
+                 </Button>
+
+                 <Button
+                    onClick={() => handleBet('down')}
+                    disabled={!!userBet || !currentRound || countdown < 3}
+                    className="w-full h-14 bg-[#ef4444] hover:bg-[#b91c1c] text-white font-bold text-lg rounded-md shadow-[0_4px_0_0_#991b1b] active:shadow-none active:translate-y-[4px] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                 >
+                    <div className="flex items-center gap-2">
+                       <TrendingDown className="stroke-[3px]" />
+                       <span>LOWER</span>
+                    </div>
+                 </Button>
+              </div>
+              
+              {/* Status Message */}
+               <div className="mt-6 text-center">
+                  {userBet ? (
+                     <div className="bg-[#1e293b] border border-[#334155] rounded-lg p-4 animate-in fade-in zoom-in duration-300">
+                        <div className="text-[10px] text-[#94a3b8] uppercase font-bold mb-1">Current Position</div>
+                        <div className="flex items-center justify-center gap-2 text-sm font-bold text-white">
+                           {userBet.prediction === 'up' 
+                              ? <span className="text-[#10b981] flex items-center gap-1"><TrendingUp size={14}/> HIGHER</span> 
+                              : <span className="text-[#ef4444] flex items-center gap-1"><TrendingDown size={14}/> LOWER</span>
+                           }
+                           <span className="text-[#94a3b8]">|</span>
+                           <span>${userBet.bet_amount}</span>
+                        </div>
+                     </div>
+                  ) : countdown < 3 && countdown > 0 ? (
+                    <div className="text-xs text-[#f59e0b] font-bold bg-[#f59e0b]/10 p-2 rounded border border-[#f59e0b]/30">
+                       ⚠ Locked
+                    </div>
+                  ) : null}
+               </div>
+
+           </div>
+
+           {/* Footer of Panel */}
+           <div className="mt-auto border-t border-[#1e293b] p-4 bg-[#1e293b]/20">
+               <div className="flex items-center justify-between text-[10px] text-[#64748b]">
+                  <span>Server Time</span>
+                  <span className="font-mono">{new Date().toLocaleTimeString()}</span>
+               </div>
+           </div>
         </div>
       </div>
     </div>
