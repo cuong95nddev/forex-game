@@ -46,8 +46,6 @@ export default function TradingInterface() {
         time: new Date(price.timestamp).getTime() / 1000,
         value: price.price
       }))
-      console.log('📊 Chart data:', chartData.slice(0, 5), 'Total:', chartData.length)
-      console.log('📊 Price values:', chartData.map(d => d.value).slice(0, 10))
       setChartPrices(chartData)
     }
   }, [priceHistory])
@@ -98,11 +96,6 @@ export default function TradingInterface() {
   const priceChange = goldPrice?.change || 0
   const priceChangePercent = goldPrice ? ((priceChange / goldPrice.price) * 100).toFixed(2) : '0.00'
   const isPositive = priceChange >= 0
-
-  // Debug logging
-  useEffect(() => {
-    console.log('💰 TradingInterface goldPrice updated:', goldPrice)
-  }, [goldPrice])
 
   const quickAmounts = [100, 500, 1000, 5000]
   return (    <div className="min-h-screen bg-[#0a0e27] text-white">

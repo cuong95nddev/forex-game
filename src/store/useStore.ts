@@ -48,6 +48,11 @@ interface AppState {
 
 let countdownInterval: NodeJS.Timeout | null = null
 let broadcastChannel: any = null
+let goldPriceChannel: any = null
+let roundsChannel: any = null
+let betsChannel: any = null
+let subscriptionsActive = false
+let acceptedAdminSession: string | null = null // Only accept broadcasts from one admin
 
 export const useStore = create<AppState>((set, get) => ({
   user: null,
@@ -59,14 +64,23 @@ export const useStore = create<AppState>((set, get) => ({
   countdown: 15,
   winRate: 0.95,
   onlineUsers: 0,
-  loading: true,
+  loading: false, // Changed default to false
 
   loadUser: async () => {
     try {
+      console.log('🔄 Starting loadUser...')
+      set({ loading: true })
+      
       // Initialize database with initial data if needed
-      await initializeDatabase()
+      console.log('🔄 Initializing database...')
+      const dbInitialized = await Promise.race([
+        initializeDatabase(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Database initialization timeout')), 10000))
+      ])
+      console.log('✅ Database initialized:', dbInitialized)
       
       const fingerprint = await getFingerprint()
+      console.log('🔑 Got fingerprint:', fingerprint)
       
       const { data: userData, error: userError } = await supabase
         .from('users')
@@ -75,16 +89,20 @@ export const useStore = create<AppState>((set, get) => ({
         .single()
 
       if (userError && userError.code !== 'PGRST116') {
-        console.error('Error loading user:', userError)
+        console.error('❌ Error loading user:', userError)
         set({ loading: false })
         return
       }
 
       if (userData) {
+        console.log('✅ User found:', userData.name)
         set({ user: userData })
+      } else {
+        console.log('ℹ️ No user found for this device')
       }
 
       // Load latest gold price
+      console.log('🔄 Loading gold price...')
       const { data: priceData } = await supabase
         .from('gold_prices')
         .select('*')
@@ -92,9 +110,13 @@ export const useStore = create<AppState>((set, get) => ({
         .limit(1)
         .single()
 
-      set({ goldPrice: priceData })
+      if (priceData) {
+        console.log('✅ Gold price loaded:', priceData.price)
+        set({ goldPrice: priceData })
+      }
 
       // Load current round
+      console.log('🔄 Loading current round...')
       const { data: roundData } = await supabase
         .from('rounds')
         .select('*')
@@ -104,11 +126,9 @@ export const useStore = create<AppState>((set, get) => ({
         .single()
 
       if (roundData) {
-        set({ currentRound: roundData })
+        console.log('✅ Active round found:', roundData.round_number)
+        set({ currentRound: roundData, countdown: 0 }) // Set countdown to 0, wait for broadcast from admin
         
-        // Don't calculate countdown here, wait for broadcast from admin
-        // Admin will send the accurate countdown via broadcast channel
-
         // Check if user has bet in this round
         if (userData) {
           const { data: betData } = await supabase
@@ -118,13 +138,19 @@ export const useStore = create<AppState>((set, get) => ({
             .eq('round_id', roundData.id)
             .single()
 
-          set({ userBet: betData })
+          if (betData) {
+            console.log('✅ User bet found:', betData.prediction)
+            set({ userBet: betData })
+          }
         }
+      } else {
+        console.log('ℹ️ No active round found')
       }
 
+      console.log('✅ loadUser completed successfully')
       set({ loading: false })
     } catch (error) {
-      console.error('Error in loadUser:', error)
+      console.error('❌ Error in loadUser:', error)
       set({ loading: false })
     }
   },
@@ -218,44 +244,68 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   subscribeToGoldPrice: () => {
-    console.log('Setting up gold price subscription...')
-    const channel = supabase
-      .channel('gold-prices-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'gold_prices'
-        },
-        (payload) => {
-          console.log('🔥 Gold price updated via realtime:', payload.new)
-          const newPrice = payload.new as GoldPrice
-          set({ goldPrice: newPrice })
-          
-          // Don't update price history here - let broadcast handle it to avoid duplicates
-          // Price history will be updated via broadcast channel which includes countdown sync
-        }
-      )
-      .subscribe((status, err) => {
-        if (err) {
-          console.error('❌ Gold price subscription error:', err)
-        }
-        console.log('✅ Gold price subscription status:', status)
-      })
+    // Clean up existing channel if it exists
+    if (goldPriceChannel) {
+      console.log('🧹 Cleaning up existing gold price channel')
+      goldPriceChannel.unsubscribe()
+      goldPriceChannel = null
+    }
     
-    return channel
+    // Note: We're not subscribing to postgres_changes for gold_prices
+    // because it can cause realtime binding errors.
+    // Gold prices will be updated via the broadcast channel from admin.
+    console.log('⏭️ Skipping gold price postgres subscription (using broadcast only)')
   },
 
   subscribeToBroadcast: () => {
-    console.log('Setting up broadcast subscription...')
+    // Prevent duplicate subscriptions
+    if (subscriptionsActive && broadcastChannel) {
+      console.log('⚠️ Broadcast subscription already active, skipping')
+      return
+    }
     
+    // Clean up existing channel if it exists
+    if (broadcastChannel) {
+      console.log('🧹 Cleaning up existing broadcast channel')
+      broadcastChannel.unsubscribe()
+      broadcastChannel = null
+    }
+    
+    subscriptionsActive = true
     broadcastChannel = supabase.channel('game-state')
     
     broadcastChannel
       .on('broadcast', { event: 'game-state' }, (payload: any) => {
-        console.log('📡 Broadcast received:', payload)
-        const { countdown, currentRound, goldPrice, winRate: broadcastWinRate } = payload.payload
+        const { countdown, currentRound, goldPrice, winRate: broadcastWinRate, adminSessionId } = payload.payload
+        
+        // If this is from a new admin session, accept it (first one wins, or reset on new round)
+        if (adminSessionId) {
+          if (!acceptedAdminSession) {
+            acceptedAdminSession = adminSessionId
+            console.log('🔒 Locked to admin session:', adminSessionId)
+          } else if (acceptedAdminSession !== adminSessionId) {
+            // Ignore broadcasts from other admin sessions
+            console.log('⚠️ Ignoring broadcast from different admin:', adminSessionId.slice(-6), '(locked to:', acceptedAdminSession.slice(-6) + ')')
+            return
+          }
+        }
+        
+        // Update countdown from admin broadcast - this is the source of truth
+        if (countdown !== undefined) {
+          console.log('⏱️ Countdown updated from admin:', countdown, 'session:', adminSessionId?.slice(-6) || 'unknown')
+          set({ countdown })
+        }
+        
+        // Update current round if provided - reset admin lock on new round
+        if (currentRound !== undefined) {
+          const oldRound = get().currentRound
+          if (oldRound && currentRound.id !== oldRound.id) {
+            // New round started, reset admin lock to allow any admin
+            acceptedAdminSession = adminSessionId || null
+            console.log('🔄 New round, reset admin lock to:', acceptedAdminSession?.slice(-6) || 'none')
+          }
+          set({ currentRound })
+        }
         
         // Update winRate if provided
         if (broadcastWinRate !== undefined) {
@@ -263,16 +313,10 @@ export const useStore = create<AppState>((set, get) => ({
         }
         
         if (goldPrice !== undefined) {
-          console.log('🔥 Gold Price from broadcast:', goldPrice, 'Type:', typeof goldPrice)
           // If goldPrice is a complete object with price and change, use it
           // Otherwise treat it as just a price number (backwards compatibility)
           if (typeof goldPrice === 'object' && goldPrice.price !== undefined) {
-            console.log('✅ Setting goldPrice object:', goldPrice)
-            set({ 
-              countdown,
-              currentRound,
-              goldPrice: goldPrice
-            })
+            set({ goldPrice: goldPrice })
             
             // Update price history
             const { priceHistory } = get()
@@ -286,7 +330,6 @@ export const useStore = create<AppState>((set, get) => ({
             // Fallback: calculate change from previous price
             const oldPrice = get().goldPrice
             const change = oldPrice ? goldPrice - oldPrice.price : 0
-            console.log('⚠️ Converting number to goldPrice object. Old:', oldPrice?.price, 'New:', goldPrice, 'Change:', change)
             
             const newPriceObj = {
               price: goldPrice,
@@ -295,11 +338,7 @@ export const useStore = create<AppState>((set, get) => ({
               id: '' // ID not needed for display
             }
             
-            set({ 
-              countdown,
-              currentRound,
-              goldPrice: newPriceObj
-            })
+            set({ goldPrice: newPriceObj })
             
             // Update price history
             const { priceHistory } = get()
@@ -310,13 +349,9 @@ export const useStore = create<AppState>((set, get) => ({
             }
             set({ priceHistory: updatedHistory })
           }
-        } else {
-          set({ countdown, currentRound })
         }
       })
-      .subscribe((status) => {
-        console.log('Broadcast subscription status:', status)
-      })
+      .subscribe()
   },
 
   loadRecentBets: async () => {
@@ -367,8 +402,26 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   subscribeToRounds: () => {
+    // Prevent duplicate subscriptions
+    if (subscriptionsActive && (roundsChannel || betsChannel)) {
+      console.log('⚠️ Rounds/Bets subscriptions already active, skipping')
+      return
+    }
+    
+    // Clean up existing channels if they exist
+    if (roundsChannel) {
+      console.log('🧹 Cleaning up existing rounds channel')
+      roundsChannel.unsubscribe()
+      roundsChannel = null
+    }
+    if (betsChannel) {
+      console.log('🧹 Cleaning up existing bets channel')
+      betsChannel.unsubscribe()
+      betsChannel = null
+    }
+    
     // Subscribe to new rounds
-    supabase
+    roundsChannel = supabase
       .channel('rounds-changes')
       .on(
         'postgres_changes',
@@ -378,7 +431,7 @@ export const useStore = create<AppState>((set, get) => ({
           table: 'rounds',
         },
         (payload) => {
-          console.log('New round started:', payload.new)
+
           const newRound = payload.new as Round
           set({ 
             currentRound: newRound,
@@ -395,7 +448,6 @@ export const useStore = create<AppState>((set, get) => ({
           table: 'rounds',
         },
         (payload) => {
-          console.log('Round updated:', payload.new)
           const updatedRound = payload.new as Round
           if (updatedRound.status === 'completed') {
             set({ currentRound: updatedRound })
@@ -405,7 +457,7 @@ export const useStore = create<AppState>((set, get) => ({
       .subscribe()
 
     // Subscribe to bet results
-    supabase
+    betsChannel = supabase
       .channel('bets-changes')
       .on(
         'postgres_changes',
@@ -419,7 +471,6 @@ export const useStore = create<AppState>((set, get) => ({
           const { user, userBet } = get()
           
           if (user && userBet && updatedBet.id === userBet.id) {
-            console.log('Your bet result:', updatedBet)
             set({ userBet: updatedBet })
 
             // Refresh user balance
