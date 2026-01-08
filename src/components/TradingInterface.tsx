@@ -2,7 +2,6 @@ import { useEffect, useState, useRef } from 'react'
 import { TrendingUp, TrendingDown, Clock, DollarSign, Users } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import TradingChart from './TradingChart'
-import SkillsPanel from './SkillsPanel'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -39,10 +38,7 @@ export default function TradingInterface() {
     isWaitingForNewGame,
     isGameCompleted,
     leaderboard,
-    maxRound,
-    skillNotification,
-    setSkillNotification,
-    activeSkillEffects
+    maxRound
   } = useStore()
   
   const [betAmount, setBetAmount] = useState('100')
@@ -156,16 +152,6 @@ export default function TradingInterface() {
        return () => clearTimeout(timer)
     }
   }, [lastLossAmount, setLastLossAmount])
-
-  useEffect(() => {
-    if (skillNotification !== null) {
-       // Clear the skill notification after 5 seconds
-       const timer = setTimeout(() => {
-          setSkillNotification(null)
-       }, 5000)
-       return () => clearTimeout(timer)
-    }
-  }, [skillNotification, setSkillNotification])
 
   const handleBet = async (prediction: 'up' | 'down') => {
     const amount = parseFloat(betAmount)
@@ -397,7 +383,6 @@ export default function TradingInterface() {
   const priceChangePercent = goldPrice ? ((priceChange / goldPrice.price) * 100).toFixed(2) : '0.00'
   const isPositive = priceChange >= 0
   const quickAmounts = [100, 500, 1000, 5000, 10000, 50000]
-  const isFrozen = user && activeSkillEffects.some(e => e.user_id === user.id && e.skill_type === 'freeze')
 
   return (
     <div className="min-h-screen bg-[#0b0f13] text-foreground flex flex-col font-sans relative overflow-hidden">
@@ -431,20 +416,6 @@ export default function TradingInterface() {
       )}
 
       {/* SKILL NOTIFICATION OVERLAY */}
-      {skillNotification !== null && (
-         <div className="absolute inset-0 z-[100] flex items-center justify-center pointer-events-none">
-            <div className="flex flex-col items-center animate-in fade-in zoom-in slide-in-from-bottom-10 duration-500">
-               {skillNotification.amount !== 0 && (
-                  <div className="text-6xl font-black text-[#a855f7] drop-shadow-[0_0_15px_rgba(168,85,247,0.5)] mb-2">
-                     {skillNotification.amount < 0 ? '-' : '+'}${Math.abs(skillNotification.amount).toLocaleString()}
-                  </div>
-               )}
-               <div className="text-2xl font-bold text-white uppercase tracking-widest bg-[#a855f7]/20 px-6 py-2 rounded-full border border-[#a855f7]/50 backdrop-blur-md">
-                  {skillNotification.message}
-               </div>
-            </div>
-         </div>
-      )}
       
       {/* PROFESSIONAL HEADER */}
       <header className="h-14 border-b border-[#1e293b] bg-[#0f172a] flex items-center px-4 justify-between sticky top-0 z-50">
@@ -759,17 +730,9 @@ export default function TradingInterface() {
 
               {/* Action Buttons */}
               <div className="space-y-3">
-                 {isFrozen && (
-                   <div className="bg-[#3b82f6]/10 border border-[#3b82f6]/30 rounded-lg p-3 mb-3 animate-pulse">
-                     <div className="flex items-center gap-2 text-[#3b82f6] text-sm font-bold">
-                       <span className="text-xl">❄️</span>
-                       <span>You are frozen and cannot bet!</span>
-                     </div>
-                   </div>
-                 )}
                  <Button
                     onClick={() => handleBet('up')}
-                    disabled={!!userBet || !currentRound || countdown < 3 || isFrozen}
+                    disabled={!!userBet || !currentRound || countdown < 3}
                     className="w-full h-14 bg-[#10b981] hover:bg-[#059669] text-white font-bold text-lg rounded-md shadow-[0_4px_0_0_#065f46] active:shadow-none active:translate-y-[4px] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                  >
                     <div className="flex items-center gap-2">
@@ -780,7 +743,7 @@ export default function TradingInterface() {
 
                  <Button
                     onClick={() => handleBet('down')}
-                    disabled={!!userBet || !currentRound || countdown < 3 || isFrozen}
+                    disabled={!!userBet || !currentRound || countdown < 3}
                     className="w-full h-14 bg-[#ef4444] hover:bg-[#b91c1c] text-white font-bold text-lg rounded-md shadow-[0_4px_0_0_#991b1b] active:shadow-none active:translate-y-[4px] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                  >
                     <div className="flex items-center gap-2">
@@ -822,9 +785,6 @@ export default function TradingInterface() {
            </div>
         </div>
         </div>
-        
-        {/* Bottom Section - Skills Panel (Full Width) */}
-        <SkillsPanel />
         
       </div>
     </div>

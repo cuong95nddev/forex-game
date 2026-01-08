@@ -26,35 +26,6 @@ interface Bet {
   created_at: string
 }
 
-interface Skill {
-  id: string
-  name: string
-  description: string
-  skill_type: string
-  cooldown_rounds: number
-  parameters: {
-    min_steal_percentage?: number
-    max_steal_percentage?: number
-  }
-}
-
-interface UserSkill {
-  id: string
-  user_id: string
-  skill_id: string
-  last_used_round: number
-  is_active: boolean
-  skill?: Skill
-}
-
-interface ActiveSkillEffect {
-  id: string
-  user_id: string
-  skill_type: string
-  effect_data: Record<string, any>
-  created_at: string
-}
-
 interface AppState {
   user: User | null
   goldPrice: GoldPrice | null
@@ -75,13 +46,9 @@ interface AppState {
   isGameCompleted: boolean
   leaderboard: User[]
   maxRound: number | null
-  userSkills: UserSkill[]
-  skillNotification: { message: string; amount: number } | null
-  activeSkillEffects: ActiveSkillEffect[]
   setLastWinAmount: (amount: number | null) => void
   lastLossAmount: number | null
   setLastLossAmount: (amount: number | null) => void
-  setSkillNotification: (notification: { message: string; amount: number } | null) => void
   initializeUser: (name: string) => Promise<void>
   loadUser: () => Promise<void>
   placeBet: (prediction: 'up' | 'down', amount: number) => Promise<boolean>
@@ -96,11 +63,6 @@ interface AppState {
   loadPriceHistory: () => Promise<void>
   loadOnlineUsers: () => Promise<void>
   loadAllUsers: () => Promise<void>
-  loadUserSkills: () => Promise<void>
-  loadActiveSkillEffects: () => Promise<void>
-  useSkill: (skillId: string, targetUserId: string, currentRound: number) => Promise<boolean>
-  subscribeToSkillUsage: () => void
-  subscribeToActiveEffects: () => void
 }
 
 let broadcastChannel: any = null
@@ -135,13 +97,9 @@ export const useStore = create<AppState>((set, get) => ({
   isGameCompleted: false,
   leaderboard: [],
   maxRound: null,
-  userSkills: [],
-  skillNotification: null,
-  activeSkillEffects: [],
 
   setLastWinAmount: (amount) => set({ lastWinAmount: amount }),
   setLastLossAmount: (amount) => set({ lastLossAmount: amount }),
-  setSkillNotification: (notification) => set({ skillNotification: notification }),
 
   loadUser: async () => {
     try {
@@ -298,25 +256,6 @@ export const useStore = create<AppState>((set, get) => ({
       return false
     }
 
-    // Clean up expired freeze effects
-    console.log('Placing bet, checking for expired freeze effects. Current round:', currentRound.round_number)
-    await supabase.rpc('cleanup_expired_freeze_effects', {
-      p_current_round: currentRound.round_number
-    })
-    
-    // Reload active effects after cleanup
-    await get().loadActiveSkillEffects()
-    
-    // Get fresh activeSkillEffects from state after reload
-    const { activeSkillEffects } = get()
-    console.log('Active skill effects after cleanup:', activeSkillEffects)
-
-    // Check if user is frozen
-    if (activeSkillEffects.some(e => e.user_id === user.id && e.skill_type === 'freeze')) {
-      toast.error('❄️ You are frozen and cannot place bets!')
-      return false
-    }
-
     if (countdown <= 0) {
       toast.warning('Betting time is over for this round!')
       return false
@@ -467,12 +406,6 @@ export const useStore = create<AppState>((set, get) => ({
             acceptedAdminSession = adminSessionId || null
             // Reload all users to reflect allowed_users from new round
             get().loadAllUsers()
-            // Clean up expired freeze effects on new round
-            console.log('New round started, cleaning up freeze effects. Old round:', oldRound.round_number, 'New round:', currentRound.round_number)
-            await supabase.rpc('cleanup_expired_freeze_effects', { p_current_round: currentRound.round_number })
-            console.log('Freeze cleanup completed, reloading active effects...')
-            await get().loadActiveSkillEffects()
-            console.log('Active effects reloaded after round change')
           }
           
           set({ currentRound })
@@ -615,19 +548,16 @@ export const useStore = create<AppState>((set, get) => ({
           leaderboard: [],
           maxRound: null,
           isWaitingForNewGame: false,
-          activeSkillEffects: [], // Clear all active skill effects on frontend
           userBet: null // Clear current bet
         })
         
         // Wait for database cleanup to complete
         await new Promise(resolve => setTimeout(resolve, 500))
         
-        console.log('🔄 Reloading user data and skills after new game...')
-        // Reload user data and skills
+        console.log('🔄 Reloading user data after new game...')
+        // Reload user data
         await get().loadUser()
-        await get().loadUserSkills() // Reload skills assigned to user
-        await get().loadActiveSkillEffects() // Should be empty now
-        console.log('✅ User data reloaded. Active effects:', get().activeSkillEffects)
+        console.log('✅ User data reloaded')
         
         toast.success('🎮 New game has started!')
       })
@@ -1057,217 +987,5 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  loadUserSkills: async () => {
-    const { user } = get()
-    if (!user) return
 
-    try {
-      console.log('Loading user skills for user:', user.id)
-      const { data, error } = await supabase
-        .from('user_skills')
-        .select(`
-          id,
-          user_id,
-          skill_id,
-          last_used_round,
-          is_active,
-          skill:skill_definitions (
-            id,
-            name,
-            description,
-            skill_type,
-            cooldown_rounds,
-            parameters
-          )
-        `)
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-
-      if (error) {
-        console.error('Error loading user skills:', error)
-        return
-      }
-
-      console.log('User skills loaded:', data)
-
-      const skills = (data || []).map((item: any) => ({
-        ...item,
-        skill: Array.isArray(item.skill) ? item.skill[0] : item.skill
-      }))
-      console.log('Processed skills:', skills)
-      set({ userSkills: skills })
-    } catch (error) {
-      console.error('Error loading user skills:', error)
-    }
-  },
-
-  useSkill: async (_skillId: string, targetUserId: string, currentRound: number) => {
-    const { user } = get()
-    if (!user) {
-      toast.error('User not found')
-      return false
-    }
-
-    try {
-      // Insert skill request for admin to process
-      const { error } = await supabase
-        .from('skill_requests')
-        .insert({
-          user_id: user.id,
-          skill_id: _skillId,
-          target_user_id: targetUserId || null,
-          round_number: currentRound,
-          status: 'pending'
-        })
-
-      if (error) {
-        console.error('Error requesting skill:', error)
-        toast.error('Failed to use skill')
-        return false
-      }
-
-      toast.success('Skill requested! Processing...')
-      return true
-    } catch (error: any) {
-      console.error('Error requesting skill:', error)
-      toast.error(error.message || 'Failed to use skill')
-      return false
-    }
-  },
-
-  subscribeToSkillUsage: () => {
-    const { user, setSkillNotification, loadUser } = get()
-    if (!user) return
-
-    console.log('Setting up skill usage subscription for user:', user.id)
-
-    // Subscribe to skill usage history to detect when user is targeted
-    const skillChannel = supabase
-      .channel('skill-usage')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'skill_usage_history',
-          filter: `target_user_id=eq.${user.id}`
-        },
-        async (payload: any) => {
-          console.log('Skill usage detected:', payload)
-          const usage = payload.new
-          
-          // Get skill details to determine type
-          const { data: skillData } = await supabase
-            .from('skill_definitions')
-            .select('skill_type, name')
-            .eq('id', usage.skill_id)
-            .single()
-          
-          if (!skillData) return
-          
-          console.log('Skill type:', skillData.skill_type, 'Metadata:', usage.metadata)
-          
-          // Handle different skill types
-          if (skillData.skill_type === 'steal') {
-            const amount = usage.metadata?.amount_stolen || 0
-            console.log('Money stolen from user:', amount)
-            
-            setSkillNotification({
-              message: `Someone stole money from you!`,
-              amount: -amount
-            })
-
-            toast.error(`💸 $${amount.toLocaleString()} was stolen from you!`, {
-              duration: 5000
-            })
-
-            await loadUser()
-
-            setTimeout(() => {
-              setSkillNotification(null)
-            }, 5000)
-          } else if (skillData.skill_type === 'freeze') {
-            console.log('User was frozen')
-            
-            setSkillNotification({
-              message: `You have been frozen!`,
-              amount: 0
-            })
-
-            toast.error(`❄️ You have been frozen and cannot bet for 1 round!`, {
-              duration: 5000
-            })
-
-            // Reload active effects to show freeze status
-            get().loadActiveSkillEffects()
-
-            // Clear notification after 5 seconds
-            setTimeout(() => {
-              setSkillNotification(null)
-            }, 5000)
-          }
-        }
-      )
-      .subscribe((status) => {
-        console.log('Skill usage subscription status:', status)
-      })
-
-    return () => {
-      console.log('Unsubscribing from skill usage')
-      skillChannel.unsubscribe()
-    }
-  },
-
-  loadActiveSkillEffects: async () => {
-    const { user } = get()
-    if (!user) return
-
-    try {
-      const { data, error } = await supabase
-        .from('active_skill_effects')
-        .select('*')
-        .eq('user_id', user.id)
-
-      if (error) {
-        console.error('Error loading active skill effects:', error)
-        return
-      }
-
-      set({ activeSkillEffects: data || [] })
-    } catch (error) {
-      console.error('Error loading active skill effects:', error)
-    }
-  },
-
-  subscribeToActiveEffects: () => {
-    const { user, loadActiveSkillEffects } = get()
-    if (!user) return
-
-    console.log('Setting up active effects subscription for user:', user.id)
-
-    // Subscribe to active skill effects changes
-    const effectsChannel = supabase
-      .channel('active-effects')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'active_skill_effects',
-          filter: `user_id=eq.${user.id}`
-        },
-        async () => {
-          console.log('Active effects changed, reloading...')
-          await loadActiveSkillEffects()
-        }
-      )
-      .subscribe((status) => {
-        console.log('Active effects subscription status:', status)
-      })
-
-    return () => {
-      console.log('Unsubscribing from active effects')
-      effectsChannel.unsubscribe()
-    }
-  },
 }))
