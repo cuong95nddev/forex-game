@@ -25,7 +25,9 @@ export default function TradingInterface() {
     loadPriceHistory,
     winRate,
     onlineUsers,
-    loadOnlineUsers
+    loadOnlineUsers,
+    allUsers,
+    loadAllUsers
   } = useStore()
   
   const [betAmount, setBetAmount] = useState('100')
@@ -71,14 +73,16 @@ export default function TradingInterface() {
     loadRecentBets()
     loadPriceHistory()
     loadOnlineUsers()
+    loadAllUsers()
     
     // Refresh online users every 5 seconds
     const interval = setInterval(() => {
       loadOnlineUsers()
+      loadAllUsers()
     }, 5000)
     
     return () => clearInterval(interval)
-  }, [loadRecentBets, loadPriceHistory, loadOnlineUsers])
+  }, [loadRecentBets, loadPriceHistory, loadOnlineUsers, loadAllUsers])
 
   useEffect(() => {
     // Convert price history to chart format
@@ -346,6 +350,48 @@ export default function TradingInterface() {
               </TabsContent>
             </Tabs>
           </div>
+        </div>
+
+        {/* MIDDLE COLUMN: User Leaderboard */}
+        <div className="w-[240px] bg-[#0f172a] border-l border-[#1e293b] flex flex-col hidden lg:flex z-10">
+          <div className="p-3 border-b border-[#1e293b] bg-[#1e293b]/20 flex items-center justify-between">
+            <h2 className="text-xs font-bold text-white uppercase tracking-widest">Traders</h2>
+            <Badge variant="outline" className="text-[10px] h-5 border-[#334155] text-[#94a3b8]">
+              {allUsers?.length || 0}
+            </Badge>
+          </div>
+          
+          <ScrollArea className="flex-1">
+             <Table>
+                <TableHeader className="bg-[#1e293b]/50 sticky top-0 z-10 backdrop-blur-sm">
+                   <TableRow className="hover:bg-transparent border-b border-[#1e293b]">
+                      <TableHead className="h-8 text-[10px] font-bold text-[#94a3b8] w-[60%]">USER</TableHead>
+                      <TableHead className="h-8 text-[10px] font-bold text-[#94a3b8] text-right">BALANCE</TableHead>
+                   </TableRow>
+                </TableHeader>
+                <TableBody>
+                   {allUsers?.map((u) => (
+                      <TableRow key={u.id} className="hover:bg-[#1e293b]/50 border-b border-[#1e293b]/50 h-10">
+                         <TableCell className="py-1 font-medium text-xs">
+                            <div className="flex items-center gap-2">
+                               <Avatar className="h-5 w-5 border border-[#334155]">
+                                  <AvatarFallback className="text-[9px] bg-[#1e293b] text-[#94a3b8]">
+                                     {u.name?.substring(0, 1).toUpperCase()}
+                                  </AvatarFallback>
+                               </Avatar>
+                               <span className={u.id === user?.id ? "text-[#f59e0b]" : "text-[#cbd5e1]"}>
+                                  {u.name}
+                               </span>
+                            </div>
+                         </TableCell>
+                         <TableCell className="py-1 text-right font-mono text-xs text-[#94a3b8]">
+                            ${u.balance?.toLocaleString()}
+                         </TableCell>
+                      </TableRow>
+                   ))}
+                </TableBody>
+             </Table>
+          </ScrollArea>
         </div>
 
         {/* RIGHT COLUMN: Trading Panel */}

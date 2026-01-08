@@ -36,6 +36,7 @@ interface AppState {
   winRate: number
   onlineUsers: number
   loading: boolean
+  allUsers: User[]
   initializeUser: (name: string) => Promise<void>
   loadUser: () => Promise<void>
   placeBet: (prediction: 'up' | 'down', amount: number) => Promise<boolean>
@@ -46,6 +47,7 @@ interface AppState {
   loadRecentBets: () => Promise<void>
   loadPriceHistory: () => Promise<void>
   loadOnlineUsers: () => Promise<void>
+  loadAllUsers: () => Promise<void>
 }
 
 let countdownInterval: NodeJS.Timeout | null = null
@@ -67,6 +69,7 @@ export const useStore = create<AppState>((set, get) => ({
   countdown: 15,
   winRate: 0.95,
   onlineUsers: 0,
+  allUsers: [],
   loading: false, // Changed default to false
 
   loadUser: async () => {
@@ -425,6 +428,21 @@ export const useStore = create<AppState>((set, get) => ({
       }
     } catch (error) {
       console.error('Error loading online users:', error)
+    }
+  },
+
+  loadAllUsers: async () => {
+    try {
+      const { data } = await supabase
+        .from('users')
+        .select('*')
+        .order('balance', { ascending: false })
+
+      if (data) {
+        set({ allUsers: data })
+      }
+    } catch (error) {
+      console.error('Error loading all users:', error)
     }
   },
 
