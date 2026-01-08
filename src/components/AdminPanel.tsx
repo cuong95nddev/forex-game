@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
-import { Play, Pause, TrendingUp, TrendingDown, RefreshCw, Settings, Users, Database, AlertTriangle, DollarSign, Trash2 } from 'lucide-react'
+import { Play, Pause, TrendingUp, TrendingDown, RefreshCw, Settings, Users, Database, AlertTriangle, DollarSign, Trash2, LayoutDashboard, LogOut, Menu } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -38,7 +38,7 @@ export default function AdminPanel() {
   
   // User management
   const [users, setUsers] = useState<any[]>([])
-  const [selectedTab, setSelectedTab] = useState<'control' | 'users' | 'data'>('control')
+  const [activeView, setActiveView] = useState<'dashboard' | 'users' | 'settings' | 'data'>('dashboard')
   const [editingUser, setEditingUser] = useState<string | null>(null)
   const [editBalance, setEditBalance] = useState<number>(0)
   
@@ -110,13 +110,13 @@ export default function AdminPanel() {
   useEffect(() => {
     const statsInterval = setInterval(() => {
       loadStats()
-      if (selectedTab === 'users') {
+      if (activeView === 'users') {
         loadUsers()
       }
     }, 3000)
     
     return () => clearInterval(statsInterval)
-  }, [selectedTab])
+  }, [activeView])
 
   // Effect to handle auto mode changes - pause/resume countdown
   useEffect(() => {
@@ -817,596 +817,406 @@ export default function AdminPanel() {
   }
 
   return (
-    <div className="min-h-screen p-8 bg-background">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Warning Banner */}
-        <Alert className="bg-gradient-to-r from-[#f59e0b]/15 to-[#f59e0b]/10 border-2 border-[#f59e0b]/40 shadow-lg">
-          <AlertTriangle className="h-6 w-6 text-[#f59e0b]" />
-          <AlertDescription className="ml-2">
-            <div className="font-extrabold text-[#f59e0b] text-lg">⚠️ QUAN TRỌNG: Giữ trang này mở để game hoạt động!</div>
-            <div className="text-sm mt-1.5 text-muted-foreground font-medium">
-              Bảng điều khiển đang phát sóng trạng thái game đến tất cả người chơi. Nếu đóng trang này, người chơi sẽ không thể tiếp tục.
+    <div className="flex h-screen bg-muted/40 text-foreground">
+      {/* Sidebar */}
+      <aside className="fixed inset-y-0 left-0 z-10 hidden w-64 flex-col border-r bg-background sm:flex">
+        <div className="flex h-14 items-center border-b px-6 lg:h-[60px]">
+          <a className="flex items-center gap-2 font-semibold" href="#">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#f59e0b] via-[#d97706] to-[#b45309] flex items-center justify-center text-white shadow-lg glow-gold">
+              <Settings size={20} />
             </div>
-          </AlertDescription>
-        </Alert>
-
-        {/* Header */}
-        <Card className="bg-gradient-to-br from-card via-card/95 to-card/90 border-2 border-[#f59e0b]/30 shadow-2xl glow-gold">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-4xl flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#f59e0b] via-[#d97706] to-[#b45309] flex items-center justify-center text-white shadow-2xl glow-gold">
-                    <Settings size={36} />
-                  </div>
-                  <div>
-                    <div className="bg-gradient-to-r from-[#f59e0b] to-[#fbbf24] bg-clip-text text-transparent font-extrabold">
-                      Admin Control Panel
-                    </div>
-                    <CardDescription className="mt-1 text-base font-semibold">Quản lý cài đặt game, người dùng và dữ liệu</CardDescription>
-                  </div>
-                </CardTitle>
-              </div>
-              <div className="flex items-center gap-4">
-                <Badge variant="outline" className="bg-primary/15 text-primary border-primary/40 px-4 py-2.5 shadow-lg">
-                  <div className="w-2.5 h-2.5 bg-primary rounded-full animate-pulse mr-2"></div>
-                  <span className="font-bold">Broadcasting Live</span>
-                </Badge>
-                <Button
-                  onClick={() => setIsAutoMode(!isAutoMode)}
-                  size="lg"
-                  className={`font-bold px-6 py-6 shadow-xl border-2 ${
-                    isAutoMode 
-                      ? 'bg-gradient-to-br from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 border-primary/50 glow-green' 
-                      : 'bg-gradient-to-br from-muted to-muted/80 border-border'
-                  }`}
-                >
-                  {isAutoMode ? <Play size={22} className="mr-2" /> : <Pause size={22} className="mr-2" />}
-                  {isAutoMode ? 'Chế độ Tự động: BẬT' : 'Chế độ Tự động: TẮT'}
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-        </Card>
-
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-6">
-          <Card className="bg-gradient-to-br from-card to-card/80 border-2 border-primary/30 shadow-xl hover:shadow-2xl transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-3">
-                <CardDescription className="uppercase text-xs tracking-widest font-bold">Tổng Số Vòng</CardDescription>
-                <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
-                  <RefreshCw size={20} className="text-primary" />
-                </div>
-              </div>
-              <div className="text-5xl font-extrabold text-primary drop-shadow-[0_0_10px_rgba(16,185,129,0.3)]">
-                {stats.totalRounds}
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-card to-card/80 border-2 border-[#f59e0b]/30 shadow-xl hover:shadow-2xl transition-shadow glow-gold">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-3">
-                <CardDescription className="uppercase text-xs tracking-widest font-bold">Người Chơi Online</CardDescription>
-                <div className="w-10 h-10 rounded-lg bg-[#f59e0b]/20 flex items-center justify-center">
-                  <Users size={20} className="text-[#f59e0b]" />
-                </div>
-              </div>
-              <div className="text-5xl font-extrabold bg-gradient-to-r from-[#f59e0b] to-[#fbbf24] bg-clip-text text-transparent">
-                {stats.activePlayers}
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-card to-card/80 border-2 border-destructive/30 shadow-xl hover:shadow-2xl transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-3">
-                <CardDescription className="uppercase text-xs tracking-widest font-bold">Tổng Lệnh Đặt</CardDescription>
-                <div className="w-10 h-10 rounded-lg bg-destructive/20 flex items-center justify-center">
-                  <Database size={20} className="text-destructive" />
-                </div>
-              </div>
-              <div className="text-5xl font-extrabold text-destructive drop-shadow-[0_0_10px_rgba(239,68,68,0.3)]">
-                {stats.totalBets}
-              </div>
-            </CardContent>
-          </Card>
+            <span className="">Admin Panel</span>
+          </a>
         </div>
+        <nav className="grid gap-1 px-2 py-4 text-sm font-medium">
+          <Button 
+            variant={activeView === 'dashboard' ? 'secondary' : 'ghost'} 
+            className="justify-start gap-2"
+            onClick={() => setActiveView('dashboard')}
+          >
+            <LayoutDashboard className="h-4 w-4" />
+            Dashboard
+          </Button>
+          <Button 
+            variant={activeView === 'users' ? 'secondary' : 'ghost'} 
+            className="justify-start gap-2"
+            onClick={() => setActiveView('users')}
+          >
+            <Users className="h-4 w-4" />
+            Users
+          </Button>
+          <Button 
+            variant={activeView === 'settings' ? 'secondary' : 'ghost'} 
+            className="justify-start gap-2"
+            onClick={() => setActiveView('settings')}
+          >
+            <Settings className="h-4 w-4" />
+            Settings
+          </Button>
+          <Button 
+            variant={activeView === 'data' ? 'secondary' : 'ghost'} 
+            className="justify-start gap-2"
+            onClick={() => setActiveView('data')}
+          >
+            <Database className="h-4 w-4" />
+            Data
+          </Button>
+        </nav>
+      </aside>
 
-        {/* Tabs */}
-        <Tabs value={selectedTab} onValueChange={(value) => setSelectedTab(value as any)} className="space-y-6">
-          <TabsList className="bg-card/80 p-1.5 border-2 border-border/50 shadow-lg">
-            <TabsTrigger 
-              value="control" 
-              className="flex items-center gap-2 data-[state=active]:bg-gradient-to-br data-[state=active]:from-primary data-[state=active]:to-primary/80 data-[state=active]:text-white data-[state=active]:shadow-lg font-semibold"
+      {/* Main Content */}
+      <div className="flex flex-col sm:gap-4 sm:py-4 sm:pl-64 w-full h-full">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
+          <div className="flex items-center gap-4">
+             {/* Mobile menu trigger could go here */}
+             <h1 className="text-xl font-semibold capitalize">{activeView}</h1>
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 gap-1.5 hidden sm:flex">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+              </span>
+              Broadcasting Live
+            </Badge>
+            <Button
+              onClick={() => setIsAutoMode(!isAutoMode)}
+              size="sm"
+              variant={isAutoMode ? "default" : "outline"}
+              className={`${
+                isAutoMode 
+                  ? 'bg-gradient-to-r from-primary to-emerald-600 hover:from-primary/90 hover:to-emerald-600/90' 
+                  : ''
+              }`}
             >
-              <Settings size={18} />
-              Điều Khiển Game
-            </TabsTrigger>
-            <TabsTrigger 
-              value="users" 
-              className="flex items-center gap-2 data-[state=active]:bg-gradient-to-br data-[state=active]:from-[#f59e0b] data-[state=active]:to-[#d97706] data-[state=active]:text-white data-[state=active]:shadow-lg font-semibold"
-            >
-              <Users size={18} />
-              Quản Lý Người Dùng
-            </TabsTrigger>
-            <TabsTrigger 
-              value="data" 
-              className="flex items-center gap-2 data-[state=active]:bg-gradient-to-br data-[state=active]:from-destructive data-[state=active]:to-destructive/80 data-[state=active]:text-white data-[state=active]:shadow-lg font-semibold"
-            >
-              <Database size={18} />
-              Quản Lý Dữ Liệu
-            </TabsTrigger>
-          </TabsList>
+              {isAutoMode ? <Play size={16} className="mr-2" /> : <Pause size={16} className="mr-2" />}
+              {isAutoMode ? 'Auto: ON' : 'Auto: OFF'}
+            </Button>
+          </div>
+        </header>
+        
+        <main className="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8 overflow-auto">
+          
+          {/* Dashboard View */}
+          {activeView === 'dashboard' && (
+            <div className="space-y-6">
+              {/* Warning Banner */}
+              <Alert className="bg-amber-500/10 border-amber-500/50 text-amber-700 dark:text-amber-400">
+                <AlertTriangle className="h-4 w-4 stroke-amber-600 dark:stroke-amber-400" />
+                 <AlertDescription className="ml-2 font-medium">
+                  Keep this page open to maintain game broadcast. Closing it will stop the game.
+                </AlertDescription>
+              </Alert>
 
-          {/* Game Control Tab */}
-          <TabsContent value="control" className="space-y-6">
-            {/* Game Settings */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings size={24} />
-                  System Configuration
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-3 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Round Duration (seconds)</label>
-                    <Input
-                      type="number"
-                      value={roundDuration}
-                      onChange={(e) => {
-                        setRoundDuration(parseInt(e.target.value) || 15)
-                        setHasUnsavedChanges(true)
-                      }}
-                      min={5}
-                      max={300}
-                    />
-                    <p className="text-xs text-muted-foreground">Current: {roundDuration}s</p>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Price Update Interval (seconds)</label>
-                    <Input
-                      type="number"
-                      value={priceUpdateInterval}
-                      onChange={(e) => {
-                        setPriceUpdateInterval(parseInt(e.target.value) || 1)
-                        setHasUnsavedChanges(true)
-                      }}
-                      min={1}
-                      max={10}
-                    />
-                    <p className="text-xs text-muted-foreground">Current: {priceUpdateInterval}s</p>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Win Rate (%)</label>
-                    <Input
-                      type="number"
-                      value={winRate * 100}
-                      onChange={(e) => {
-                        setWinRate((parseFloat(e.target.value) || 95) / 100)
-                        setHasUnsavedChanges(true)
-                      }}
-                      min={50}
-                      max={200}
-                      step={5}
-                    />
+              {/* Stats Grid */}
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Rounds</CardTitle>
+                    <RefreshCw className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{stats.totalRounds}</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Active Players</CardTitle>
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{stats.activePlayers}</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Bets</CardTitle>
+                    <Database className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{stats.totalBets}</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Current Price</CardTitle>
+                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">${currentPrice.toFixed(2)}</div>
                     <p className="text-xs text-muted-foreground">
-                      Win: x{winRate.toFixed(2)} (Bet $100 → Receive ${(100 + 100 * winRate).toFixed(0)})
+                      {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}
                     </p>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-3 gap-6 pt-4 border-t">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Default User Balance ($)</label>
-                    <Input
-                      type="number"
-                      value={defaultUserBalance}
-                      onChange={(e) => {
-                        setDefaultUserBalance(parseFloat(e.target.value) || 10000)
-                        setHasUnsavedChanges(true)
-                      }}
-                      min={100}
-                      max={1000000}
-                      step={1000}
-                    />
-                    <p className="text-xs text-muted-foreground">New users start with ${defaultUserBalance.toLocaleString()}</p>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Minimum Bet ($)</label>
-                    <Input
-                      type="number"
-                      value={minBetAmount}
-                      onChange={(e) => {
-                        setMinBetAmount(parseFloat(e.target.value) || 10)
-                        setHasUnsavedChanges(true)
-                      }}
-                      min={1}
-                      max={1000}
-                    />
-                    <p className="text-xs text-muted-foreground">Min bet: ${minBetAmount}</p>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Maximum Bet ($)</label>
-                    <Input
-                      type="number"
-                      value={maxBetAmount}
-                      onChange={(e) => {
-                        setMaxBetAmount(parseFloat(e.target.value) || 50000)
-                        setHasUnsavedChanges(true)
-                      }}
-                      min={100}
-                      max={10000000}
-                      step={1000}
-                    />
-                    <p className="text-xs text-muted-foreground">Max bet: ${maxBetAmount.toLocaleString()}</p>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">No Bet Penalty ($)</label>
-                    <Input
-                      type="number"
-                      value={noBetPenalty}
-                      onChange={(e) => {
-                        setNoBetPenalty(parseFloat(e.target.value) || 0)
-                        setHasUnsavedChanges(true)
-                      }}
-                      min={0}
-                      max={10000}
-                      step={10}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      {noBetPenalty > 0 
-                        ? `Users who don't bet will lose $${noBetPenalty.toLocaleString()}`
-                        : 'No penalty (disabled)'
-                      }
-                    </p>
-                  </div>
-                </div>
-                
-                <Alert>
-                  <AlertDescription>
-                    Configuration changes will apply to the next round
-                  </AlertDescription>
-                </Alert>
-                
-                <Button
-                  onClick={applySettings}
-                  disabled={!hasUnsavedChanges || isSaving}
-                  size="lg"
-                  className="w-full"
-                  variant={hasUnsavedChanges ? "default" : "outline"}
-                >
-                  {isSaving ? 'Applying...' : hasUnsavedChanges ? 'Apply Configuration' : 'Configuration Applied'}
-                </Button>
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
+              </div>
 
-            {/* Current Round */}
-            {currentRound && (
-              <Card className="bg-gradient-to-br from-primary/20 to-primary/5 border-2 border-primary/50 shadow-2xl glow-green">
-                <CardHeader>
-                  <CardTitle className="text-primary text-2xl font-extrabold flex items-center gap-2">
-                    <RefreshCw size={28} className="animate-spin" />
-                    Vòng Hiện Tại
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-3 gap-6">
-                    <div className="bg-card/50 p-4 rounded-xl border border-primary/30">
-                      <CardDescription className="mb-2 uppercase text-xs tracking-widest font-bold text-primary">Số Vòng</CardDescription>
-                      <div className="text-4xl font-extrabold text-primary drop-shadow-[0_0_10px_rgba(16,185,129,0.3)]">
-                        #{currentRound.round_number}
+               {/* Current Round Card */}
+              {currentRound && (
+                <Card className="bg-gradient-to-br from-primary/5 via-transparent to-transparent border-primary/20">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <RefreshCw className="h-5 w-5 animate-spin text-primary" />
+                         Current Round #{currentRound.round_number}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="bg-background/50 p-4 rounded-xl border">
+                         <div className="text-sm font-medium text-muted-foreground mb-1">Status</div>
+                         <div className="text-xl font-bold uppercase text-primary">Active</div>
+                      </div>
+                      <div className="bg-background/50 p-4 rounded-xl border">
+                        <div className="text-sm font-medium text-muted-foreground mb-1">Start Price</div>
+                         <div className="text-xl font-bold">${currentRound.start_price.toFixed(2)}</div>
+                      </div>
+                      <div className="bg-background/50 p-4 rounded-xl border">
+                        <div className="text-sm font-medium text-muted-foreground mb-1">Time Remaining</div>
+                         <div className={`text-xl font-bold ${countdown <= 5 ? 'text-destructive animate-pulse' : ''}`}>
+                          {countdown}s
+                         </div>
                       </div>
                     </div>
-                    <div className="bg-card/50 p-4 rounded-xl border border-border/50">
-                      <CardDescription className="mb-2 uppercase text-xs tracking-widest font-bold">Giá Mở Cửa</CardDescription>
-                      <div className="text-4xl font-extrabold">${currentRound.start_price.toFixed(2)}</div>
-                    </div>
-                    <div className="bg-card/50 p-4 rounded-xl border border-border/50">
-                      <CardDescription className="mb-2 uppercase text-xs tracking-widest font-bold text-primary">Thời Gian Còn Lại</CardDescription>
-                      <div className={`text-4xl font-extrabold ${
-                        countdown <= 5 ? 'text-destructive animate-pulse' : 'text-primary'
-                      }`}>
-                        {countdown}s
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                  </CardContent>
+                </Card>
+              )}
 
-            {/* Price Control */}
-            <Card>
+              {/* Price Control Section */}
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+                  <Card className="col-span-4">
+                    <CardHeader>
+                      <CardTitle>Price Control</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {isAutoMode ? (
+                        <div className="flex flex-col items-center justify-center p-8 text-center space-y-4 bg-muted/30 rounded-lg border-2 border-dashed">
+                          <RefreshCw className="h-10 w-10 animate-spin text-primary" />
+                          <div>
+                            <h3 className="font-semibold">Auto Mode Enabled</h3>
+                            <p className="text-sm text-muted-foreground">Price updates automatically every {priceUpdateInterval} seconds</p>
+                          </div>
+                          <Button variant="outline" onClick={() => setIsAutoMode(false)}>Switch to Manual</Button>
+                        </div>
+                      ) : (
+                        <div className="space-y-6">
+                          <div className="flex gap-4">
+                             <Button 
+                               onClick={handlePriceIncrease}
+                               className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white h-24 text-lg font-bold"
+                             >
+                                <TrendingUp className="mr-2 h-6 w-6" /> UP
+                             </Button>
+                             <Button 
+                               onClick={handlePriceDecrease}
+                               className="flex-1 bg-rose-500 hover:bg-rose-600 text-white h-24 text-lg font-bold"
+                             >
+                                <TrendingDown className="mr-2 h-6 w-6" /> DOWN
+                             </Button>
+                          </div>
+                           <div className="grid gap-4">
+                              <div className="grid gap-2">
+                                <label className="text-sm font-medium">Manual Price Set</label>
+                                <div className="flex gap-2">
+                                  <Input 
+                                    type="number" 
+                                    value={currentPrice} 
+                                    onChange={(e) => setCurrentPrice(parseFloat(e.target.value))}
+                                  />
+                                   <Button onClick={handleManualUpdate}>Update</Button>
+                                </div>
+                              </div>
+                           </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                   <Card className="col-span-3">
+                     <CardHeader>
+                       <CardTitle>Live Feed</CardTitle>
+                     </CardHeader>
+                     <CardContent>
+                        <ul className="space-y-2 text-sm">
+                           <li>• Round Duration: <span className="font-mono bg-muted px-1 rounded">{roundDuration}s</span></li>
+                           <li>• Win Rate: <span className="font-mono bg-muted px-1 rounded">{winRate*100}%</span></li>
+                           <li>• Min Bet: <span className="font-mono bg-muted px-1 rounded">${minBetAmount}</span></li>
+                           <li>• Max Bet: <span className="font-mono bg-muted px-1 rounded">${maxBetAmount}</span></li>
+                        </ul>
+                     </CardContent>
+                   </Card>
+              </div>
+            </div>
+          )}
+
+          {/* Users View */}
+          {activeView === 'users' && (
+             <Card>
               <CardHeader>
-                <CardTitle>Price Control</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Auto Mode Settings */}
-                {isAutoMode && (
-                  <Alert>
-                    <RefreshCw size={20} className="animate-spin" />
-                    <AlertDescription className="ml-2 font-semibold">
-                      Auto mode enabled - Price updates every {priceUpdateInterval} seconds
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                {/* Manual Control */}
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Current Price (USD)</label>
-                    <div className="flex gap-4">
-                      <Input
-                        type="number"
-                        value={currentPrice}
-                        onChange={(e) => setCurrentPrice(parseFloat(e.target.value))}
-                        disabled={isAutoMode}
-                        className="text-xl font-bold"
-                        step={0.01}
-                      />
-                      <Button
-                        onClick={handlePriceIncrease}
-                        disabled={isAutoMode}
-                        size="lg"
-                        className="bg-gradient-to-br from-[#10b981] to-[#059669] hover:from-[#059669] hover:to-[#047857] text-white font-bold shadow-xl glow-green"
-                      >
-                        <TrendingUp size={24} />
-                      </Button>
-                      <Button
-                        onClick={handlePriceDecrease}
-                        disabled={isAutoMode}
-                        size="lg"
-                        className="bg-gradient-to-br from-[#ef4444] to-[#dc2626] hover:from-[#dc2626] hover:to-[#b91c1c] text-white font-bold shadow-xl glow-red"
-                      >
-                        <TrendingDown size={24} />
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Price Change (USD)</label>
-                    <Input
-                      type="number"
-                      value={priceChange}
-                      onChange={(e) => setPriceChange(parseFloat(e.target.value))}
-                      disabled={isAutoMode}
-                      step={0.01}
-                    />
-                  </div>
-
-                  <Button
-                    onClick={handleManualUpdate}
-                    disabled={isAutoMode}
-                    size="lg"
-                    className="w-full"
-                  >
-                    Manual Update Price
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Instructions */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Instructions</CardTitle>
+                <CardTitle>User Management</CardTitle>
+                <CardDescription>Manage your registered users and their balances.</CardDescription>
               </CardHeader>
               <CardContent>
-                <ul className="space-y-2 text-sm text-muted-foreground">
-                  <li>• <strong className="font-semibold">Auto mode:</strong> Price changes randomly every {priceUpdateInterval} seconds and broadcasts in real-time to clients</li>
-                  <li>• <strong className="font-semibold">Manual mode:</strong> You can adjust the price and update manually</li>
-                  <li>• Each betting round lasts <strong className="font-semibold">{roundDuration} seconds</strong></li>
-                  <li>• Current reward rate: <strong className="font-semibold">{(winRate * 100).toFixed(0)}%</strong> (Bet $100, win and receive ${(100 + 100 * winRate).toFixed(0)})</li>
-                  <li>• System automatically calculates results and pays rewards after {roundDuration} seconds</li>
-                  <li>• Price history is saved for real-time chart drawing</li>
-                </ul>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* User Management Tab */}
-          <TabsContent value="users">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users size={24} />
-                  User Management ({users.length} users)
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-[600px]">
-                  <Table>
+                 <ScrollArea className="h-[600px] pr-4">
+                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Name</TableHead>
+                        <TableHead>User</TableHead>
                         <TableHead>Balance</TableHead>
-                        <TableHead>Fingerprint</TableHead>
-                        <TableHead>Created</TableHead>
-                        <TableHead>Actions</TableHead>
+                        <TableHead>ID / Fingerprint</TableHead>
+                        <TableHead>Joined</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {users.map((user) => (
+                       {users.map((user) => (
                         <TableRow key={user.id}>
-                          <TableCell className="font-semibold">{user.name}</TableCell>
-                          <TableCell>
+                          <TableCell className="font-medium">{user.name}</TableCell>
+                           <TableCell>
                             {editingUser === user.id ? (
-                              <div className="flex gap-2">
+                              <div className="flex items-center gap-2">
                                 <Input
                                   type="number"
                                   value={editBalance}
                                   onChange={(e) => setEditBalance(parseFloat(e.target.value))}
-                                  className="w-32"
-                                  step={0.01}
+                                  className="w-24 h-8"
                                 />
-                                <Button
-                                  onClick={() => updateUserBalance(user.id, editBalance)}
-                                  size="sm"
-                                >
-                                  Save
+                                <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600" onClick={() => updateUserBalance(user.id, editBalance)}>
+                                  <TrendingUp className="h-4 w-4" />
                                 </Button>
-                                <Button
-                                  onClick={() => setEditingUser(null)}
-                                  size="sm"
-                                  variant="outline"
-                                >
-                                  Cancel
+                                <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600" onClick={() => setEditingUser(null)}>
+                                  <LogOut className="h-4 w-4 rotate-180" />
                                 </Button>
                               </div>
                             ) : (
-                              <Badge variant="outline">
-                                <DollarSign size={14} className="mr-1" />
-                                {user.balance.toFixed(2)}
-                              </Badge>
+                               <span className="font-mono">${user.balance.toFixed(2)}</span>
                             )}
                           </TableCell>
-                          <TableCell className="font-mono text-sm text-muted-foreground">
-                            {user.fingerprint.substring(0, 16)}...
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {new Date(user.created_at).toLocaleString()}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
-                              {editingUser !== user.id && (
-                                <Button
-                                  onClick={() => {
-                                    setEditingUser(user.id)
-                                    setEditBalance(user.balance)
-                                  }}
-                                  size="sm"
-                                >
-                                  Edit Balance
-                                </Button>
-                              )}
-                              <Button
-                                onClick={() => deleteUser(user.id)}
-                                size="sm"
-                                variant="destructive"
-                              >
-                                <Trash2 size={14} className="mr-1" />
-                                Delete
-                              </Button>
-                            </div>
+                          <TableCell className="text-muted-foreground text-xs font-mono">{user.fingerprint.substring(0, 12)}...</TableCell>
+                          <TableCell className="text-muted-foreground text-xs">{new Date(user.created_at).toLocaleDateString()}</TableCell>
+                          <TableCell className="text-right">
+                             {editingUser !== user.id && (
+                                <div className="flex justify-end gap-2">
+                                  <Button variant="outline" size="sm" onClick={() => { setEditingUser(user.id); setEditBalance(user.balance); }}>Edit</Button>
+                                  <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => deleteUser(user.id)}>Delete</Button>
+                                </div>
+                             )}
                           </TableCell>
                         </TableRow>
-                      ))}
+                       ))}
                     </TableBody>
-                  </Table>
-                  {users.length === 0 && (
-                    <div className="text-center py-8 text-muted-foreground">
-                      No users found
-                    </div>
-                  )}
-                </ScrollArea>
+                   </Table>
+                 </ScrollArea>
               </CardContent>
-            </Card>
-          </TabsContent>
+             </Card>
+          )}
 
-          {/* Data Management Tab */}
-          <TabsContent value="data" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Database size={24} />
-                  Data Management
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Card>
-                  <CardContent className="p-4">
-                    <h3 className="font-bold mb-2">Clean Price History</h3>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      Remove all historical price data and reset to initial price (2000). Useful for clearing chart data.
-                    </p>
-                    <Button
-                      onClick={cleanPriceHistory}
-                    >
-                      Clean Price History
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-4">
-                    <h3 className="font-bold mb-2">Clean Old Rounds</h3>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      Delete completed rounds older than 24 hours. Helps reduce database size.
-                    </p>
-                    <Button
-                      onClick={cleanOldRounds}
-                    >
-                      Clean Old Rounds
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-2 border-destructive/50 bg-destructive/5">
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-3">
-                      <AlertTriangle className="text-destructive mt-1" size={28} />
-                      <div className="flex-1">
-                        <h3 className="font-bold mb-2 text-destructive text-lg">DANGER ZONE: Reset All Data</h3>
-                        <p className="text-sm text-muted-foreground mb-3">
-                          <strong>WARNING:</strong> This will permanently delete ALL data including:
-                        </p>
-                        <ul className="text-sm text-muted-foreground mb-3 list-disc list-inside space-y-1">
-                          <li>All users and their balances</li>
-                          <li>All bets and betting history</li>
-                          <li>All rounds (active and completed)</li>
-                          <li>All price history and chart data</li>
-                        </ul>
-                        <p className="text-sm mb-3 font-semibold text-destructive">
-                          This action cannot be undone. Use only when you want to completely restart the system.
-                        </p>
-                        <Button
-                          onClick={resetAllData}
-                          variant="destructive"
-                          className="flex items-center gap-2"
-                        >
-                          <Trash2 size={18} />
-                          Reset All Data
-                        </Button>
+          {/* Settings View */}
+          {activeView === 'settings' && (
+            <div className="max-w-4xl space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Game Configuration</CardTitle>
+                  <CardDescription>Adjust the core mechanics of the game rounds.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-6">
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Round Duration (s)</label>
+                        <Input type="number" value={roundDuration} onChange={(e) => { setRoundDuration(parseInt(e.target.value)||15); setHasUnsavedChanges(true); }} />
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </CardContent>
-            </Card>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Price Update Interval (s)</label>
+                        <Input type="number" value={priceUpdateInterval} onChange={(e) => { setPriceUpdateInterval(parseInt(e.target.value)||1); setHasUnsavedChanges(true); }} />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Win Rate</label>
+                         <Input type="number" value={(winRate * 100).toFixed(0)} onChange={(e) => { setWinRate(parseFloat(e.target.value)/100 || 0.95); setHasUnsavedChanges(true); }} />
+                         <p className="text-xs text-muted-foreground">Payout multiplier (e.g. 95 = 1.95x)</p>
+                      </div>
+                   </div>
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Database Statistics</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Total Rounds:</span>
-                    <Badge variant="outline">{stats.totalRounds}</Badge>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Total Users:</span>
-                    <Badge variant="outline">{stats.activePlayers}</Badge>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Total Bets:</span>
-                    <Badge variant="outline">{stats.totalBets}</Badge>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Current Price:</span>
-                    <Badge variant="outline">${currentPrice.toFixed(2)}</Badge>
-                  </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Financial Limits</CardTitle>
+                  <CardDescription>Set limits for betting and balances.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                       <div className="space-y-2">
+                          <label className="text-sm font-medium">Default Balance ($)</label>
+                          <Input type="number" value={defaultUserBalance} onChange={(e) => { setDefaultUserBalance(parseFloat(e.target.value)||10000); setHasUnsavedChanges(true); }} />
+                       </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">No Bet Penalty ($)</label>
+                          <Input type="number" value={noBetPenalty} onChange={(e) => { setNoBetPenalty(parseFloat(e.target.value)||0); setHasUnsavedChanges(true); }} />
+                       </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Min Bet ($)</label>
+                          <Input type="number" value={minBetAmount} onChange={(e) => { setMinBetAmount(parseFloat(e.target.value)||10); setHasUnsavedChanges(true); }} />
+                       </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Max Bet ($)</label>
+                          <Input type="number" value={maxBetAmount} onChange={(e) => { setMaxBetAmount(parseFloat(e.target.value)||50000); setHasUnsavedChanges(true); }} />
+                       </div>
+                    </div>
+                </CardContent>
+                <div className="p-6 border-t bg-muted/20">
+                    <Button onClick={applySettings} disabled={!hasUnsavedChanges || isSaving} size="lg" className="w-full sm:w-auto">
+                      {isSaving ? 'Saving...' : 'Save Configuration'}
+                    </Button>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+              </Card>
+            </div>
+          )}
+
+          {/* Data View */}
+          {activeView === 'data' && (
+            <div className="max-w-4xl space-y-6">
+               <Card>
+                 <CardHeader>
+                   <CardTitle>Database Maintenance</CardTitle>
+                   <CardDescription>Clean up old data to keep the system running smoothly.</CardDescription>
+                 </CardHeader>
+                 <CardContent className="grid gap-4">
+                    <div className="flex items-center justify-between p-4 border rounded-lg">
+                      <div>
+                        <div className="font-semibold">Clear Price History</div>
+                        <div className="text-sm text-muted-foreground">Removes all price records except the latest ones.</div>
+                      </div>
+                       <Button variant="outline" onClick={cleanPriceHistory}>Clear</Button>
+                    </div>
+                     <div className="flex items-center justify-between p-4 border rounded-lg">
+                      <div>
+                        <div className="font-semibold">Clear Old Rounds</div>
+                        <div className="text-sm text-muted-foreground">Removes completed rounds older than 24 hours.</div>
+                      </div>
+                       <Button variant="outline" onClick={cleanOldRounds}>Clear</Button>
+                    </div>
+                 </CardContent>
+               </Card>
+
+               <Card className="border-destructive/50">
+                 <CardHeader>
+                   <CardTitle className="text-destructive">Danger Zone</CardTitle>
+                 </CardHeader>
+                 <CardContent>
+                    <div className="space-y-4">
+                       <Alert variant="destructive">
+                         <AlertTriangle className="h-4 w-4" />
+                         <AlertDescription>
+                           This action will wipe ALL data including users, bets, and settings. This cannot be undone.
+                         </AlertDescription>
+                       </Alert>
+                       <Button variant="destructive" onClick={resetAllData}>Reset Entire System</Button>
+                    </div>
+                 </CardContent>
+               </Card>
+            </div>
+          )}
+
+        </main>
       </div>
     </div>
   )
