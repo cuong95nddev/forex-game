@@ -5,7 +5,7 @@ interface BlockingLoaderProps {
   message?: string;
 }
 
-export const BlockingLoader = ({ isLoading, message = "Connecting to Exchange..." }: BlockingLoaderProps) => {
+export const BlockingLoader = ({ isLoading, message = "Connecting to Banana Market..." }: BlockingLoaderProps) => {
   if (!isLoading) return null;
 
   return (

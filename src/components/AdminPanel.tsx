@@ -1118,15 +1118,15 @@ export default function AdminPanel() {
     <div className="flex h-screen bg-[#0b0f13] text-white font-sans overflow-hidden select-none">
       {/* Leaderboard Dialog */}
       <Dialog open={showLeaderboardDialog} onOpenChange={setShowLeaderboardDialog}>
-        <DialogContent className="max-w-4xl bg-[#131722] border-[#2a2e39] text-white shadow-2xl">
-          <DialogHeader className="border-b border-[#2a2e39] pb-4">
+        <DialogContent className="max-w-4xl bg-[#1e293b] border-[#334155] text-white shadow-2xl">
+          <DialogHeader className="border-b border-[#334155] pb-4">
             <DialogTitle className="text-xl font-semibold text-white flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#f7931a] to-[#f59e0b] flex items-center justify-center shadow-lg">
                 <span className="text-2xl">🏆</span>
               </div>
               <div>
                 <div className="text-xl font-bold tracking-tight">Game Completed</div>
-                <div className="text-sm font-normal text-[#787b86] mt-0.5">Final Standings After {maxRound} Rounds</div>
+                <div className="text-sm font-normal text-[#94a3b8] mt-0.5">Final Standings After {maxRound} Rounds</div>
               </div>
             </DialogTitle>
           </DialogHeader>
@@ -1134,7 +1134,7 @@ export default function AdminPanel() {
           <ScrollArea className="max-h-[520px]">
             <div className="space-y-0 mt-2">
               {/* Header */}
-              <div className="grid grid-cols-[60px_1fr_140px] gap-3 px-4 py-2 text-xs font-semibold text-[#787b86] border-b border-[#2a2e39] bg-[#1e222d]">
+              <div className="grid grid-cols-[60px_1fr_140px] gap-3 px-4 py-2 text-xs font-semibold text-[#94a3b8] border-b border-[#334155] bg-[#1e293b]/50">
                 <div>RANK</div>
                 <div>TRADER</div>
                 <div className="text-right">BALANCE</div>
@@ -1147,12 +1147,12 @@ export default function AdminPanel() {
                   { bg: 'bg-gradient-to-r from-[#c0c0c0]/5 to-transparent', border: 'border-l-[#c0c0c0]', text: 'text-[#c0c0c0]', rank: '🥈' },
                   { bg: 'bg-gradient-to-r from-[#cd7f32]/5 to-transparent', border: 'border-l-[#cd7f32]', text: 'text-[#cd7f32]', rank: '🥉' },
                 ]
-                const rankStyle = rankColors[index] || { bg: 'bg-[#1e222d]/30', border: 'border-l-[#2a2e39]', text: 'text-[#787b86]', rank: `${index + 1}` }
+                const rankStyle = rankColors[index] || { bg: 'bg-transparent', border: 'border-l-[#334155]', text: 'text-[#94a3b8]', rank: `${index + 1}` }
                 
                 return (
                   <div 
                     key={user.id} 
-                    className={`grid grid-cols-[60px_1fr_140px] gap-3 px-4 py-3 border-l-2 ${rankStyle.border} ${rankStyle.bg} hover:bg-[#1e222d]/50 transition-colors border-b border-[#2a2e39]/50`}
+                    className={`grid grid-cols-[60px_1fr_140px] gap-3 px-4 py-3 border-l-2 ${rankStyle.border} ${rankStyle.bg} hover:bg-[#334155]/20 transition-colors border-b border-[#334155]/50`}
                   >
                     <div className="flex items-center">
                       <div className={`text-lg font-bold ${rankStyle.text} tabular-nums`}>
@@ -1162,8 +1162,8 @@ export default function AdminPanel() {
                     
                     <div className="flex items-center min-w-0">
                       <div className="min-w-0 flex-1">
-                        <div className="font-semibold text-[#d1d4dc] truncate text-sm">{user.name}</div>
-                        <div className="text-xs text-[#787b86] truncate font-mono">{user.fingerprint}</div>
+                        <div className="font-semibold text-[#e2e8f0] truncate text-sm">{user.name}</div>
+                        <div className="text-xs text-[#94a3b8] truncate font-mono">{user.fingerprint}</div>
                       </div>
                     </div>
                     
@@ -1172,7 +1172,7 @@ export default function AdminPanel() {
                         <div className={`text-base font-bold tabular-nums ${index < 3 ? rankStyle.text : 'text-[#2962ff]'}`}>
                           ${user.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </div>
-                        <div className="text-[10px] text-[#787b86] uppercase tracking-wider mt-0.5">USD</div>
+                        <div className="text-[10px] text-[#94a3b8] uppercase tracking-wider mt-0.5">USD</div>
                       </div>
                     </div>
                   </div>
@@ -1181,10 +1181,10 @@ export default function AdminPanel() {
             </div>
           </ScrollArea>
 
-          <DialogFooter className="border-t border-[#2a2e39] pt-4 mt-4">
+          <DialogFooter className="border-t border-[#334155] pt-4 mt-4">
             <Button 
               onClick={() => setShowLeaderboardDialog(false)} 
-              className="bg-[#2a2e39] hover:bg-[#363a45] text-[#d1d4dc] border-0 font-medium"
+              className="bg-[#334155] hover:bg-[#475569] text-[#e2e8f0] border-0 font-medium"
             >
               Close
             </Button>

@@ -176,7 +176,7 @@ export default function TradingInterface() {
       <div className="min-h-screen bg-[#0b0f13] flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#f59e0b] mx-auto mb-4"></div>
-          <p className="text-[#94a3b8]">Connecting to market...</p>
+          <p className="text-[#94a3b8]">Connecting to banana market... 🍌</p>
         </div>
       </div>
     )
@@ -185,40 +185,40 @@ export default function TradingInterface() {
   // Show waiting state when admin is configuring new game or no active game
   if (isGameCompleted && leaderboard.length > 0 && maxRound) {
     return (
-      <div className="min-h-screen bg-[#131722] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[#0b0f13] flex items-center justify-center p-4">
         <div className="max-w-5xl w-full">
           {/* Header Section */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-[#f7931a] to-[#f59e0b] mb-4 shadow-2xl shadow-[#f59e0b]/30">
               <span className="text-5xl">🏆</span>
             </div>
-            <h1 className="text-4xl font-bold text-white mb-2 tracking-tight">Game Completed</h1>
-            <p className="text-[#787b86] text-lg">Final results after {maxRound} rounds</p>
+            <h1 className="text-4xl font-bold text-white mb-2 tracking-tight">🍌 Banana Game Completed 🍌</h1>
+            <p className="text-[#94a3b8] text-lg">Final banana standings after {maxRound} rounds</p>
           </div>
           
           {/* Leaderboard Container */}
-          <div className="bg-[#1e222d] rounded-lg border border-[#2a2e39] overflow-hidden shadow-2xl">
+          <div className="bg-[#1e293b] rounded-lg border border-[#334155] overflow-hidden shadow-2xl">
             {/* Leaderboard Header */}
-            <div className="px-6 py-4 border-b border-[#2a2e39] bg-gradient-to-r from-[#1e222d] to-[#2a2e39]">
+            <div className="px-6 py-4 border-b border-[#334155] bg-[#1e293b]/50">
               <h2 className="text-lg font-bold text-white flex items-center gap-2">
                 <span className="text-[#f59e0b]">★</span>
                 Final Standings
                 <Badge className="ml-auto bg-[#2962ff] text-white border-0 text-xs font-semibold">
-                  {leaderboard.length} Traders
+                  {leaderboard.length} Banana Traders
                 </Badge>
               </h2>
             </div>
             
             <ScrollArea className="max-h-[540px]">
               {/* Table Header */}
-              <div className="grid grid-cols-[80px_1fr_160px] gap-4 px-6 py-3 text-xs font-bold text-[#787b86] border-b border-[#2a2e39] bg-[#1e222d] sticky top-0 z-10">
+              <div className="grid grid-cols-[80px_1fr_160px] gap-4 px-6 py-3 text-xs font-bold text-[#94a3b8] border-b border-[#334155] bg-[#1e293b] sticky top-0 z-10">
                 <div>RANK</div>
-                <div>TRADER</div>
+                <div>BANANA TRADER</div>
                 <div className="text-right">FINAL BALANCE</div>
               </div>
               
               {/* Leaderboard Items */}
-              <div className="divide-y divide-[#2a2e39]/50">
+              <div className="divide-y divide-[#334155]/50">
                 {leaderboard.map((player, index) => {
                   const isCurrentUser = player.id === user?.id
                   const rankStyles = [
@@ -228,8 +228,8 @@ export default function TradingInterface() {
                   ]
                   const rankStyle = rankStyles[index] || { 
                     bg: 'from-transparent via-transparent', 
-                    border: 'border-l-[#2a2e39]', 
-                    text: 'text-[#787b86]', 
+                    border: 'border-l-[#334155]', 
+                    text: 'text-[#94a3b8]', 
                     rank: `${index + 1}`,
                     glow: ''
                   }
@@ -237,7 +237,7 @@ export default function TradingInterface() {
                   return (
                     <div 
                       key={player.id} 
-                      className={`grid grid-cols-[80px_1fr_160px] gap-4 px-6 py-4 border-l-[3px] ${rankStyle.border} bg-gradient-to-r ${rankStyle.bg} to-transparent hover:bg-[#2a2e39]/20 transition-all ${isCurrentUser ? 'ring-1 ring-[#2962ff]/30' : ''} ${rankStyle.glow ? `shadow-lg ${rankStyle.glow}` : ''}`}
+                      className={`grid grid-cols-[80px_1fr_160px] gap-4 px-6 py-4 border-l-[3px] ${rankStyle.border} bg-gradient-to-r ${rankStyle.bg} to-transparent hover:bg-[#334155]/20 transition-all ${isCurrentUser ? 'ring-1 ring-[#2962ff]/30' : ''} ${rankStyle.glow ? `shadow-lg ${rankStyle.glow}` : ''}`}
                     >
                       <div className="flex items-center">
                         <div className={`text-xl font-bold ${rankStyle.text} tabular-nums flex items-center gap-2`}>
@@ -249,7 +249,7 @@ export default function TradingInterface() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <span className={`font-bold text-[15px] truncate ${
-                              isCurrentUser ? 'text-[#2962ff]' : 'text-[#d1d4dc]'
+                              isCurrentUser ? 'text-[#2962ff]' : 'text-[#e2e8f0]'
                             }`}>
                               {player.name}
                             </span>
@@ -259,7 +259,7 @@ export default function TradingInterface() {
                               </Badge>
                             )}
                           </div>
-                          <div className="text-xs text-[#787b86] truncate font-mono">{player.fingerprint}</div>
+                          <div className="text-xs text-[#94a3b8] truncate font-mono">{player.fingerprint}</div>
                         </div>
                       </div>
                       
@@ -269,11 +269,11 @@ export default function TradingInterface() {
                             index === 0 ? 'text-[#f7931a]' : 
                             index === 1 ? 'text-[#c0c0c0]' : 
                             index === 2 ? 'text-[#cd7f32]' : 
-                            isCurrentUser ? 'text-[#2962ff]' : 'text-[#d1d4dc]'
+                            isCurrentUser ? 'text-[#2962ff]' : 'text-[#e2e8f0]'
                           }`}>
-                            ${player.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            🍌{player.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </div>
-                          <div className="text-[10px] text-[#787b86] uppercase tracking-wider">USD</div>
+                          <div className="text-[10px] text-[#94a3b8] uppercase tracking-wider">BANANAS</div>
                         </div>
                       </div>
                     </div>
@@ -285,7 +285,7 @@ export default function TradingInterface() {
           
           {/* Footer Message */}
           <div className="text-center mt-6">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#1e222d] border border-[#2a2e39] text-[#787b86] text-sm">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#1e293b] border border-[#334155] text-[#94a3b8] text-sm">
               <div className="w-2 h-2 rounded-full bg-[#f59e0b] animate-pulse"></div>
               Waiting for admin to start a new game...
             </div>
@@ -354,7 +354,7 @@ export default function TradingInterface() {
                           </div>
                         </TableCell>
                         <TableCell className="py-3 text-right font-mono text-sm text-[#94a3b8]">
-                          ${onlineUser.balance?.toLocaleString()}
+                          🍌{onlineUser.balance?.toLocaleString()}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -364,7 +364,7 @@ export default function TradingInterface() {
             ) : (
               <div className="text-center py-12">
                 <Users className="h-12 w-12 text-[#334155] mx-auto mb-2" />
-                <p className="text-[#64748b]">No players online yet</p>
+                <p className="text-[#64748b]">No banana traders online yet 🍌</p>
               </div>
             )}
           </div>
@@ -392,10 +392,10 @@ export default function TradingInterface() {
          <div className="absolute inset-0 z-[100] flex items-center justify-center pointer-events-none">
             <div className="flex flex-col items-center animate-in fade-in zoom-in slide-in-from-bottom-10 duration-500">
                <div className="text-6xl font-black text-[#10b981] drop-shadow-[0_0_15px_rgba(16,185,129,0.5)] mb-2">
-                  +${lastWinAmount.toLocaleString()}
+                  +🍌{lastWinAmount.toLocaleString()}
                </div>
                <div className="text-2xl font-bold text-white uppercase tracking-widest bg-[#10b981]/20 px-6 py-2 rounded-full border border-[#10b981]/50 backdrop-blur-md">
-                  YOU WON!
+                  🎉 BANANA WIN! 🎉
                </div>
             </div>
          </div>
@@ -406,10 +406,10 @@ export default function TradingInterface() {
          <div className="absolute inset-0 z-[100] flex items-center justify-center pointer-events-none">
             <div className="flex flex-col items-center animate-in fade-in zoom-in slide-in-from-bottom-10 duration-500">
                <div className="text-6xl font-black text-[#ef4444] drop-shadow-[0_0_15px_rgba(239,68,68,0.5)] mb-2">
-                  -${lastLossAmount.toLocaleString()}
+                  -🍌{lastLossAmount.toLocaleString()}
                </div>
                <div className="text-2xl font-bold text-white uppercase tracking-widest bg-[#ef4444]/20 px-6 py-2 rounded-full border border-[#ef4444]/50 backdrop-blur-md">
-                  YOU LOST
+                  😢 BANANAS SLIPPED! 😢
                </div>
             </div>
          </div>
@@ -424,14 +424,14 @@ export default function TradingInterface() {
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#f59e0b] to-[#b45309] flex items-center justify-center shadow-lg">
               <DollarSign size={18} className="text-white font-bold" />
             </div>
-            <span className="text-xl font-bold tracking-tight text-white">PRO<span className="text-[#f59e0b]">TRADE</span></span>
+            <span className="text-xl font-bold tracking-tight text-white">🍌 BANANA<span className="text-[#f59e0b]">TRADE</span></span>
           </div>
           
           <div className="hidden md:flex items-center gap-4 border-l border-[#1e293b] pl-6 text-sm">
             <div className="flex flex-col">
-              <span className="text-[#94a3b8] text-[10px] uppercase font-bold tracking-wider">Symbol</span>
+              <span className="text-[#94a3b8] text-[10px] uppercase font-bold tracking-wider">Fruit</span>
               <span className="font-bold text-white flex items-center gap-1">
-                XAU/USD <span className="bg-[#f59e0b] text-black text-[10px] px-1 rounded font-extrabold">GOLD</span>
+                🍌 BNN/USD <span className="bg-[#f59e0b] text-black text-[10px] px-1 rounded font-extrabold">BANANA</span>
               </span>
             </div>
             
@@ -457,9 +457,9 @@ export default function TradingInterface() {
 
         <div className="flex items-center gap-4">
           <div className={`hidden md:flex flex-col items-end mr-4 transition-transform duration-200 ${balanceFlash ? 'scale-105' : ''}`}>
-            <span className="text-[#94a3b8] text-[10px] uppercase font-bold tracking-wider">Available Balance</span>
+            <span className="text-[#94a3b8] text-[10px] uppercase font-bold tracking-wider">🍌 Banana Wallet</span>
             <div className="text-[#f59e0b] font-mono font-bold text-lg flex items-center gap-1">
-              ${user.balance.toLocaleString()}
+              🍌{user.balance.toLocaleString()}
             </div>
           </div>
           
@@ -516,10 +516,10 @@ export default function TradingInterface() {
               <div className="px-4 border-b border-[#1e293b] flex items-center justify-between bg-[#1e293b]/30">
                 <TabsList className="bg-transparent h-10 p-0">
                   <TabsTrigger value="positions" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-[#f59e0b] data-[state=active]:text-[#f59e0b] rounded-none px-4 h-full border-b-2 border-transparent text-[#94a3b8] font-bold text-xs uppercase tracking-wider">
-                    Recent Positions
+                    🍌 Recent Banana Trades
                   </TabsTrigger>
                   <TabsTrigger value="market" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-[#f59e0b] data-[state=active]:text-[#f59e0b] rounded-none px-4 h-full border-b-2 border-transparent text-[#94a3b8] font-bold text-xs uppercase tracking-wider">
-                    Market Activity
+                    🍌 Banana Market Activity
                   </TabsTrigger>
                 </TabsList>
               </div>
@@ -546,11 +546,11 @@ export default function TradingInterface() {
                                 <span className={`text-xs font-bold px-2 py-0.5 rounded ${
                                   bet.prediction === 'up' ? 'bg-[#10b981]/20 text-[#10b981]' : 'bg-[#ef4444]/20 text-[#ef4444]'
                                 }`}>
-                                  {bet.prediction === 'up' ? 'BUY / UP' : 'SELL / DOWN'}
+                                  {bet.prediction === 'up' ? '🍌 RIPER' : '🍌 GREENER'}
                                 </span>
                               </TableCell>
                               <TableCell className="py-2 text-right text-xs font-mono font-medium">
-                                ${bet.bet_amount.toLocaleString()}
+                                🍌{bet.bet_amount.toLocaleString()}
                               </TableCell>
                               <TableCell className="py-2 text-right text-xs font-mono font-medium">
                                 {bet.result === 'won' ? (
@@ -601,11 +601,11 @@ export default function TradingInterface() {
                              <span className={`text-[10px] font-bold ${
                                 bet.prediction === 'up' ? 'text-[#10b981]' : 'text-[#ef4444]'
                              }`}>
-                                {bet.prediction === 'up' ? 'UP' : 'DOWN'}
+                                {bet.prediction === 'up' ? '🍌 RIPER' : '🍌 GREENER'}
                              </span>
                           </TableCell>
                           <TableCell className="py-2 text-right text-xs font-mono text-[#e2e8f0]">
-                            ${bet.bet_amount.toLocaleString()}
+                            🍌{bet.bet_amount.toLocaleString()}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -620,7 +620,7 @@ export default function TradingInterface() {
         {/* MIDDLE COLUMN: User Leaderboard */}
         <div className="w-[240px] bg-[#0f172a] border-l border-[#1e293b] flex flex-col hidden lg:flex z-10">
           <div className="p-3 border-b border-[#1e293b] bg-[#1e293b]/20 flex items-center justify-between">
-            <h2 className="text-xs font-bold text-white uppercase tracking-widest">Traders</h2>
+            <h2 className="text-xs font-bold text-white uppercase tracking-widest">🍌 Banana Traders</h2>
             <Badge variant="outline" className="text-[10px] h-5 border-[#334155] text-[#94a3b8]">
               {allUsers?.length || 0}
             </Badge>
@@ -660,13 +660,13 @@ export default function TradingInterface() {
                                 {userActiveBet && (
                                    <div className={`flex items-center gap-1 shrink-0 ${userActiveBet.prediction === 'up' ? 'text-[#10b981]' : 'text-[#ef4444]'}`}>
                                       {userActiveBet.prediction === 'up' ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                                      <span className="text-[10px] font-bold">${userActiveBet.bet_amount}</span>
+                                      <span className="text-[10px] font-bold">🍌{userActiveBet.bet_amount}</span>
                                    </div>
                                 )}
                             </div>
                          </TableCell>
                          <TableCell className="py-1 text-right font-mono text-xs text-[#94a3b8]">
-                            ${u.balance?.toLocaleString()}
+                            🍌{u.balance?.toLocaleString()}
                          </TableCell>
                       </TableRow>
                    )})}
@@ -679,10 +679,10 @@ export default function TradingInterface() {
         <div className="w-[320px] bg-[#0f172a] border-l border-[#1e293b] flex flex-col z-20 shadow-xl">
            
            <div className="p-4 border-b border-[#1e293b] bg-[#1e293b]/20">
-              <h2 className="text-sm font-bold text-white uppercase tracking-widest mb-1">Place Order</h2>
+              <h2 className="text-sm font-bold text-white uppercase tracking-widest mb-1">🍌 Trade Bananas</h2>
               <div className="text-[10px] text-[#94a3b8] flex justify-between">
-                <span>Wallet Balance</span>
-                <span className="text-[#f59e0b] font-mono">${user.balance.toLocaleString()}</span>
+                <span>Banana Wallet</span>
+                <span className="text-[#f59e0b] font-mono">🍌 {user.balance.toLocaleString()}</span>
               </div>
            </div>
 
@@ -690,9 +690,9 @@ export default function TradingInterface() {
               {/* Amount Input */}
               <div className="space-y-4 mb-6">
                  <div>
-                    <label className="text-[11px] font-bold text-[#94a3b8] uppercase mb-1.5 block">Amount</label>
+                    <label className="text-[11px] font-bold text-[#94a3b8] uppercase mb-1.5 block">Banana Amount</label>
                     <div className="relative">
-                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94a3b8]">$</span>
+                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94a3b8]">🍌</span>
                        <Input 
                           type="number" 
                           value={betAmount || ''}
@@ -723,8 +723,8 @@ export default function TradingInterface() {
                     <span className="text-[#10b981] font-bold">{(1 + winRate) * 100}%</span>
                  </div>
                  <div className="flex justify-between text-xs">
-                    <span className="text-[#94a3b8]">Profit</span>
-                    <span className="text-[#10b981] font-bold">+${(parseFloat(betAmount || '0') * winRate).toLocaleString()}</span>
+                    <span className="text-[#94a3b8]">Banana Profit</span>
+                    <span className="text-[#10b981] font-bold">+🍌 {(parseFloat(betAmount || '0') * winRate).toLocaleString()}</span>
                  </div>
               </div>
 
@@ -737,7 +737,7 @@ export default function TradingInterface() {
                  >
                     <div className="flex items-center gap-2">
                        <TrendingUp className="stroke-[3px]" />
-                       <span>HIGHER</span>
+                       <span>🍌 RIPER</span>
                     </div>
                  </Button>
 
@@ -748,7 +748,7 @@ export default function TradingInterface() {
                  >
                     <div className="flex items-center gap-2">
                        <TrendingDown className="stroke-[3px]" />
-                       <span>LOWER</span>
+                       <span>🍌 GREENER</span>
                     </div>
                  </Button>
               </div>
@@ -757,14 +757,14 @@ export default function TradingInterface() {
                <div className="mt-6 text-center">
                   {userBet ? (
                      <div className="bg-[#1e293b] border border-[#334155] rounded-lg p-4 animate-in fade-in zoom-in duration-300">
-                        <div className="text-[10px] text-[#94a3b8] uppercase font-bold mb-1">Current Position</div>
+                        <div className="text-[10px] text-[#94a3b8] uppercase font-bold mb-1">Current Banana Bet</div>
                         <div className="flex items-center justify-center gap-2 text-sm font-bold text-white">
                            {userBet.prediction === 'up' 
-                              ? <span className="text-[#10b981] flex items-center gap-1"><TrendingUp size={14}/> HIGHER</span> 
-                              : <span className="text-[#ef4444] flex items-center gap-1"><TrendingDown size={14}/> LOWER</span>
+                              ? <span className="text-[#10b981] flex items-center gap-1"><TrendingUp size={14}/> 🍌 RIPER</span> 
+                              : <span className="text-[#ef4444] flex items-center gap-1"><TrendingDown size={14}/> 🍌 GREENER</span>
                            }
                            <span className="text-[#94a3b8]">|</span>
-                           <span>${userBet.bet_amount}</span>
+                           <span>🍌 {userBet.bet_amount}</span>
                         </div>
                      </div>
                   ) : countdown < 3 && countdown > 0 ? (

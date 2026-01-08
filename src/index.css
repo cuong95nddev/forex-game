@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  /* Professional Forex Trading Platform Theme */
+  /* Professional Banana Trading Platform Theme */
   --background: 217 19% 8%;  /* Deep navy background */
   --foreground: 210 20% 98%;  /* Bright white text */
   --card: 217 19% 12%;  /* Slightly lighter navy for cards */
@@ -18,7 +18,7 @@
   --secondary-foreground: 210 20% 98%;
   --muted: 217 17% 16%;
   --muted-foreground: 215 15% 65%;  /* Lighter muted text */
-  --accent: 45 100% 55%;  /* Golden accent for premium look */
+  --accent: 45 100% 55%;  /* Banana yellow accent for premium look */
   --accent-foreground: 217 19% 8%;
   
   /* Vibrant danger red for DOWN */
@@ -36,7 +36,7 @@
   --chart-grid: 217 16% 18%;
   --green: 160 84% 39%;  /* Bull market green */
   --red: 0 91% 58%;  /* Bear market red */
-  --gold: 45 100% 55%;  /* Premium gold accent */
+  --banana: 45 100% 55%;  /* Premium banana yellow accent */
   --orange: 25 95% 53%;  /* Alert/warning orange */
 }
 
@@ -82,7 +82,7 @@
     box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
   }
   
-  .glow-gold {
+  .glow-banana {
     box-shadow: 0 0 20px rgba(245, 158, 11, 0.3);
   }
   

@@ -77,10 +77,10 @@ export default function HomePage() {
           
           <div>
             <h1 className="text-xl font-bold text-white uppercase tracking-wider mb-2">
-              Waiting for Server
+              🍌 Waiting for Banana Market Server
             </h1>
             <p className="text-[#94a3b8] text-sm">
-              The admin server is not online yet
+              The admin banana server is not online yet
             </p>
             <p className="text-[#64748b] text-xs mt-2">
               Please wait a moment or refresh the page
