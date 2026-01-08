@@ -51,7 +51,7 @@ export function MultiTabDetector() {
       document.body.appendChild(overlay)
       
       // Monitor and recreate overlay if removed
-      const observer = new MutationObserver((mutations) => {
+      const observer = new MutationObserver((_mutations) => {
         if (!document.getElementById('tab-blocker-overlay')) {
           document.body.appendChild(overlay)
         }
@@ -75,13 +75,11 @@ export function MultiTabDetector() {
   }, [showWarning])
 
   useEffect(() => {
-    let heartbeatInterval: NodeJS.Timeout | null = null
+    let heartbeatInterval: ReturnType<typeof setInterval> | null = null
     let isUnmounting = false
 
     // Try to acquire the lock and become the main tab
     const tryAcquireLock = async () => {
-      const lockStart = Date.now()
-      
       // Wait a bit to see if there's already an active tab
       await new Promise(resolve => setTimeout(resolve, LOCK_TIMEOUT))
       

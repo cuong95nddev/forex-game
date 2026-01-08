@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { Play, Pause, TrendingUp, TrendingDown, RefreshCw, Settings, Users, Database, AlertTriangle, LayoutDashboard, LogOut, Clock, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -460,67 +459,6 @@ export default function AdminPanel() {
         priceChangeRef.current = 0
       }
     }
-  }
-
-  const resumeCountdownTimer = (round: any, remainingSeconds: number) => {
-    // Generate unique timer ID
-    const timerId = `timer-resume-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    
-    // Clear any existing interval first
-    if (countdownInterval.current) {
-      clearInterval(countdownInterval.current)
-      countdownInterval.current = null
-      countdownTimerId.current = null
-    }
-    
-    countdownTimerId.current = timerId
-    
-    // Calculate new start time based on remaining seconds
-    const fixedDuration = roundDuration
-    const startTime = Date.now() - ((fixedDuration - remainingSeconds) * 1000)
-    
-    const updateCountdown = () => {
-      // Check if this timer is still the active one
-      if (countdownTimerId.current !== timerId) {
-        return
-      }
-      
-      const now = Date.now()
-      const elapsed = Math.floor((now - startTime) / 1000)
-      const remaining = Math.max(0, fixedDuration - elapsed)
-      
-      setCountdown(remaining)
-      
-      // Broadcast game state to all clients
-      if (broadcastChannel.current) {
-        const latestPrice = currentPriceRef.current
-        const change = latestPrice - round.start_price
-        broadcastChannel.current.send({
-          type: 'broadcast',
-          event: 'game-state',
-          payload: {
-            adminSessionId: adminSessionId.current,
-            countdown: remaining,
-            currentRound: round,
-            goldPrice: { price: latestPrice, change: change, timestamp: new Date().toISOString() },
-            roundDuration: fixedDuration,
-            winRate: winRate,
-            minBetAmount: minBetAmount,
-            maxBetAmount: maxBetAmount
-          }
-        })
-      }
-      
-      if (remaining === 0) {
-        clearInterval(countdownInterval.current)
-        countdownInterval.current = null
-        countdownTimerId.current = null
-        completeRound(round)
-      }
-    }
-    
-    updateCountdown()
-    countdownInterval.current = setInterval(updateCountdown, 1000)
   }
 
   const startCountdownTimer = (round: any) => {
@@ -1145,10 +1083,6 @@ export default function AdminPanel() {
     await updatePrice(newPrice, change)
   }
 
-  const handleManualUpdate = async () => {
-    await updatePrice(currentPrice, priceChange)
-  }
-
   const updatePrice = async (price: number, priceIncrement: number) => {
     try {
       // Calculate change relative to round start price
@@ -1178,18 +1112,6 @@ export default function AdminPanel() {
       }
     } catch (error) {
     }
-  }
-
-  const handlePriceIncrease = async () => {
-    const increase = currentPrice * 0.01 // 1%
-    const newPrice = currentPrice + increase
-    await updatePrice(newPrice, increase)
-  }
-
-  const handlePriceDecrease = async () => {
-    const decrease = currentPrice * 0.01 // 1%
-    const newPrice = currentPrice - decrease
-    await updatePrice(newPrice, -decrease)
   }
 
   return (
@@ -1600,7 +1522,7 @@ export default function AdminPanel() {
                         {users.slice(0, 10).map((user) => {
                           // Find user's bet in current round only
                           const userBet = currentRound ? currentBets.find(bet => bet.user_id === user.id && bet.round_id === currentRound.id) : null
-                          const initials = user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 1)
+                          const initials = user.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 1)
                           return (
                             <div key={user.id} className="flex items-center justify-between py-1.5 hover:bg-[#1e293b]/30 rounded px-2 transition-colors">
                               <div className="flex items-center gap-2 flex-1 min-w-0 pr-2">
@@ -1653,7 +1575,7 @@ export default function AdminPanel() {
                         {currentBets.map((bet) => {
                           const user = users.find(u => u.id === bet.user_id)
                           const userName = bet.users?.name || user?.name || 'Unknown'
-                          const initials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 1)
+                          const initials = userName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 1)
                           return (
                             <TableRow key={bet.id} className="border-[#1e293b] hover:bg-[#1e293b]/30 h-8">
                               <TableCell className="py-1 text-[10px] font-mono text-[#94a3b8]">
