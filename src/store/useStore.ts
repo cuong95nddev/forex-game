@@ -41,6 +41,8 @@ interface AppState {
   allUsers: User[]
   lastWinAmount: number | null
   setLastWinAmount: (amount: number | null) => void
+  lastLossAmount: number | null
+  setLastLossAmount: (amount: number | null) => void
   initializeUser: (name: string) => Promise<void>
   loadUser: () => Promise<void>
   placeBet: (prediction: 'up' | 'down', amount: number) => Promise<boolean>
@@ -77,9 +79,11 @@ export const useStore = create<AppState>((set, get) => ({
   onlineUsers: 0,
   allUsers: [],
   lastWinAmount: null,
+  lastLossAmount: null,
   loading: false, // Changed default to false
 
   setLastWinAmount: (amount) => set({ lastWinAmount: amount }),
+  setLastLossAmount: (amount) => set({ lastLossAmount: amount }),
 
   loadUser: async () => {
     try {
@@ -574,7 +578,9 @@ export const useStore = create<AppState>((set, get) => ({
                   zIndex: 100 // Ensure it's above everything
                 });
               } else if (updatedBet.result === 'lost') {
-                toast.error(`😔 Bạn đã thua $${updatedBet.bet_amount.toFixed(2)}`)
+                // Set the loss amount to trigger the animation in the UI
+                set({ lastLossAmount: updatedBet.bet_amount })
+                // toast.error(`😔 Bạn đã thua $${updatedBet.bet_amount.toFixed(2)}`)
               }
             }
           }

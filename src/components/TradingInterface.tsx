@@ -31,7 +31,9 @@ export default function TradingInterface() {
     allUsers,
     loadAllUsers,
     lastWinAmount,
-    setLastWinAmount
+    setLastWinAmount,
+    lastLossAmount,
+    setLastLossAmount
   } = useStore()
   
   const [betAmount, setBetAmount] = useState('100')
@@ -134,6 +136,16 @@ export default function TradingInterface() {
     }
   }, [lastWinAmount, setLastWinAmount])
 
+  useEffect(() => {
+    if (lastLossAmount !== null) {
+       // Clear the loss amount after 4 seconds to hide the animation
+       const timer = setTimeout(() => {
+          setLastLossAmount(null)
+       }, 4000)
+       return () => clearTimeout(timer)
+    }
+  }, [lastLossAmount, setLastLossAmount])
+
   const handleBet = async (prediction: 'up' | 'down') => {
     const amount = parseFloat(betAmount)
     if (isNaN(amount) || amount <= 0) {
@@ -180,6 +192,20 @@ export default function TradingInterface() {
                </div>
                <div className="text-2xl font-bold text-white uppercase tracking-widest bg-[#10b981]/20 px-6 py-2 rounded-full border border-[#10b981]/50 backdrop-blur-md">
                   YOU WON!
+               </div>
+            </div>
+         </div>
+      )}
+
+      {/* LOSS ANIMATION OVERLAY */}
+      {lastLossAmount !== null && (
+         <div className="absolute inset-0 z-[100] flex items-center justify-center pointer-events-none">
+            <div className="flex flex-col items-center animate-in fade-in zoom-in slide-in-from-bottom-10 duration-500">
+               <div className="text-6xl font-black text-[#ef4444] drop-shadow-[0_0_15px_rgba(239,68,68,0.5)] mb-2">
+                  -${lastLossAmount.toLocaleString()}
+               </div>
+               <div className="text-2xl font-bold text-white uppercase tracking-widest bg-[#ef4444]/20 px-6 py-2 rounded-full border border-[#ef4444]/50 backdrop-blur-md">
+                  YOU LOST
                </div>
             </div>
          </div>
