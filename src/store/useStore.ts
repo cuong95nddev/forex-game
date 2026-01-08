@@ -42,6 +42,7 @@ interface AppState {
   subscribeToGoldPrice: () => void
   subscribeToBroadcast: () => void
   subscribeToRounds: () => void
+  subscribeToUsers: () => void
   loadRecentBets: () => Promise<void>
   loadPriceHistory: () => Promise<void>
   loadOnlineUsers: () => Promise<void>
@@ -52,6 +53,7 @@ let broadcastChannel: any = null
 let goldPriceChannel: any = null
 let roundsChannel: any = null
 let betsChannel: any = null
+let usersChannel: any = null
 let subscriptionsActive = false
 let acceptedAdminSession: string | null = null // Only accept broadcasts from one admin
 
@@ -160,9 +162,18 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const fingerprint = await getFingerprint()
       
+      // Get default balance from settings
+      const { data: settings } = await supabase
+        .from('game_settings')
+        .select('default_user_balance')
+        .limit(1)
+        .single()
+      
+      const defaultBalance = settings?.default_user_balance || 10000
+      
       const { data: newUser, error: userError } = await supabase
         .from('users')
-        .insert([{ fingerprint, name, balance: 10000 }])
+        .insert([{ fingerprint, name, balance: defaultBalance }])
         .select()
         .single()
 
@@ -196,8 +207,23 @@ export const useStore = create<AppState>((set, get) => ({
       return false
     }
 
-    if (amount < 100) {
-      toast.warning('Số tiền cược tối thiểu là $100!')
+    // Get bet limits from settings
+    const { data: settings } = await supabase
+      .from('game_settings')
+      .select('min_bet_amount, max_bet_amount')
+      .limit(1)
+      .single()
+    
+    const minBet = settings?.min_bet_amount || 10
+    const maxBet = settings?.max_bet_amount || 50000
+
+    if (amount < minBet) {
+      toast.warning(`Số tiền cược tối thiểu là $${minBet}!`)
+      return false
+    }
+
+    if (amount > maxBet) {
+      toast.warning(`Số tiền cược tối đa là $${maxBet.toLocaleString()}!`)
       return false
     }
 
@@ -498,5 +524,76 @@ export const useStore = create<AppState>((set, get) => ({
         }
       )
       .subscribe()
+  },
+
+  subscribeToUsers: () => {
+    // Clean up existing channel if it exists
+    if (usersChannel) {
+      console.log('🧹 Cleaning up existing users channel')
+      usersChannel.unsubscribe()
+      usersChannel = null
+    }
+    
+    const currentUser = get().user
+    if (!currentUser) {
+      console.log('⚠️ No user found, skipping user subscription')
+      return
+    }
+    
+    // Subscribe to user balance changes
+    usersChannel = supabase
+      .channel('users-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'users',
+          filter: `id=eq.${currentUser.id}`,
+        },
+        async (payload) => {
+          const updatedUser = payload.new as User
+          const oldUser = payload.old as User
+          
+          console.log('💰 User balance changed:', {
+            old: oldUser.balance,
+            new: updatedUser.balance,
+            change: updatedUser.balance - oldUser.balance
+          })
+          
+          // Update user state
+          set({ user: updatedUser })
+          
+          // Check if balance decreased (could be penalty or bet placement)
+          const balanceChange = updatedUser.balance - oldUser.balance
+          
+          if (balanceChange < 0) {
+            // Balance decreased - could be penalty or bet
+            // Check if this is likely a penalty (not immediately after placing a bet)
+            const { userBet, currentRound } = get()
+            
+            // If user has no bet at all, or bet is from previous round, this is a penalty
+            const isPenalty = !userBet || (currentRound && userBet.round_id !== currentRound.id)
+            
+            if (isPenalty) {
+              const penaltyAmount = Math.abs(balanceChange)
+              console.log('💸 Penalty detected:', penaltyAmount)
+              toast.error(`⚠️ Bạn bị phạt $${penaltyAmount.toFixed(2)} vì không đặt cược!`, {
+                duration: 6000,
+                description: 'Đặt cược trong vòng tiếp theo để tránh bị phạt!'
+              })
+            }
+          } else if (balanceChange > 0) {
+            // Balance increased - user won or got refund
+            console.log('💰 Balance increased:', balanceChange)
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('👤 User subscription status:', status)
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Successfully subscribed to user balance changes for user:', currentUser.id)
+        }
+      })
   },
 }))

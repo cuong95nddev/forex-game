@@ -1,1 +1,98 @@
 @import "tailwindcss";
+
+@theme {
+  /* Professional Forex Trading Platform Theme */
+  --background: 217 19% 8%;  /* Deep navy background */
+  --foreground: 210 20% 98%;  /* Bright white text */
+  --card: 217 19% 12%;  /* Slightly lighter navy for cards */
+  --card-foreground: 210 20% 98%;
+  --popover: 217 19% 12%;
+  --popover-foreground: 210 20% 98%;
+  
+  /* Vibrant success green for UP */
+  --primary: 160 84% 39%;  /* Bright trading green */
+  --primary-foreground: 0 0% 100%;
+  
+  /* Card and secondary elements */
+  --secondary: 217 17% 16%;
+  --secondary-foreground: 210 20% 98%;
+  --muted: 217 17% 16%;
+  --muted-foreground: 215 15% 65%;  /* Lighter muted text */
+  --accent: 45 100% 55%;  /* Golden accent for premium look */
+  --accent-foreground: 217 19% 8%;
+  
+  /* Vibrant danger red for DOWN */
+  --destructive: 0 91% 58%;  /* Bright trading red */
+  --destructive-foreground: 0 0% 100%;
+  
+  /* Borders and inputs with more contrast */
+  --border: 217 16% 22%;  /* Lighter borders */
+  --input: 217 17% 18%;
+  --ring: 160 84% 39%;  /* Match primary green */
+  --radius: 0.5rem;
+  
+  /* Trading specific colors */
+  --chart-bg: 217 19% 10%;
+  --chart-grid: 217 16% 18%;
+  --green: 160 84% 39%;  /* Bull market green */
+  --red: 0 91% 58%;  /* Bear market red */
+  --gold: 45 100% 55%;  /* Premium gold accent */
+  --orange: 25 95% 53%;  /* Alert/warning orange */
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* Custom scrollbar for professional look */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 4px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
+  }
+}
+
+/* Glow effects for trading elements */
+@layer utilities {
+  .glow-green {
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+  }
+  
+  .glow-red {
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+  }
+  
+  .glow-gold {
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.3);
+  }
+  
+  .border-glow-green {
+    border-color: hsl(var(--green));
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
+  }
+  
+  .border-glow-red {
+    border-color: hsl(var(--red));
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.2);
+  }
+}

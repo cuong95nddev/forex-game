@@ -5,7 +5,7 @@ import { useStore } from '../store/useStore'
 import { toast } from 'sonner'
 
 export default function HomePage() {
-  const { user, loading, loadUser, initializeUser, subscribeToGoldPrice, subscribeToBroadcast, subscribeToRounds } = useStore()
+  const { user, loading, loadUser, initializeUser, subscribeToGoldPrice, subscribeToBroadcast, subscribeToRounds, subscribeToUsers } = useStore()
 
   useEffect(() => {
     console.log('HomePage mounted, loading data...')
@@ -22,6 +22,14 @@ export default function HomePage() {
     }
   }, [])
 
+  // Subscribe to user changes after user is loaded
+  useEffect(() => {
+    if (user) {
+      console.log('User loaded, subscribing to user changes...')
+      subscribeToUsers()
+    }
+  }, [user])
+
   const handleNameSubmit = async (name: string) => {
     try {
       await initializeUser(name)
@@ -34,10 +42,10 @@ export default function HomePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-yellow-500 mx-auto mb-4"></div>
-          <p className="text-white text-xl">Đang tải...</p>
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-xl">Đang tải...</p>
         </div>
       </div>
     )
