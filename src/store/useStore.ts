@@ -31,6 +31,7 @@ interface AppState {
   currentRound: Round | null
   userBet: Bet | null
   recentBets: Bet[]
+  activeBets: Bet[]
   priceHistory: GoldPrice[]
   countdown: number
   winRate: number
@@ -45,6 +46,7 @@ interface AppState {
   subscribeToRounds: () => void
   subscribeToUsers: () => void
   loadRecentBets: () => Promise<void>
+  loadActiveBets: () => Promise<void>
   loadPriceHistory: () => Promise<void>
   loadOnlineUsers: () => Promise<void>
   loadAllUsers: () => Promise<void>
@@ -65,6 +67,7 @@ export const useStore = create<AppState>((set, get) => ({
   currentRound: null,
   userBet: null,
   recentBets: [],
+  activeBets: [],
   priceHistory: [],
   countdown: 15,
   winRate: 0.95,
@@ -400,6 +403,22 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
+  loadActiveBets: async () => {
+    try {
+      const { data } = await supabase
+        .from('bets')
+        .select('*')
+        .eq('result', 'pending')
+        .order('created_at', { ascending: false })
+
+      if (data) {
+        set({ activeBets: data })
+      }
+    } catch (error) {
+      console.error('Error loading active bets:', error)
+    }
+  },
+
   loadPriceHistory: async () => {
     try {
       const { data } = await supabase
@@ -507,36 +526,40 @@ export const useStore = create<AppState>((set, get) => ({
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*',
           schema: 'public',
           table: 'bets',
         },
         async (payload) => {
-          const updatedBet = payload.new as Bet
-          const { user, userBet } = get()
-          
-          if (user && userBet && updatedBet.id === userBet.id) {
-            set({ userBet: updatedBet })
+          // Reload bet lists on any change
+          get().loadActiveBets()
+          get().loadRecentBets()
 
-            // Refresh user balance
-            const { data: userData } = await supabase
-              .from('users')
-              .select('*')
-              .eq('id', user.id)
-              .single()
+          // Handle updates for current user
+          if (payload.eventType === 'UPDATE') {
+            const updatedBet = payload.new as Bet
+            const { user, userBet } = get()
+            
+            if (user && userBet && updatedBet.id === userBet.id) {
+              set({ userBet: updatedBet })
 
-            if (userData) {
-              set({ user: userData })
-            }
+              // Refresh user balance
+              const { data: userData } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', user.id)
+                .single()
 
-            // Reload recent bets
-            get().loadRecentBets()
+              if (userData) {
+                set({ user: userData })
+              }
 
-            // Show result
-            if (updatedBet.result === 'won') {
-              toast.success(`🎉 Chúc mừng! Bạn đã thắng $${updatedBet.profit.toFixed(2)}!`)
-            } else if (updatedBet.result === 'lost') {
-              toast.error(`😔 Bạn đã thua $${updatedBet.bet_amount.toFixed(2)}`)
+              // Show result
+              if (updatedBet.result === 'won') {
+                toast.success(`🎉 Chúc mừng! Bạn đã thắng $${updatedBet.profit.toFixed(2)}!`)
+              } else if (updatedBet.result === 'lost') {
+                toast.error(`😔 Bạn đã thua $${updatedBet.bet_amount.toFixed(2)}`)
+              }
             }
           }
         }

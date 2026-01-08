@@ -21,6 +21,8 @@ export default function TradingInterface() {
     placeBet, 
     recentBets, 
     loadRecentBets,
+    activeBets,
+    loadActiveBets,
     priceHistory,
     loadPriceHistory,
     winRate,
@@ -71,6 +73,7 @@ export default function TradingInterface() {
 
   useEffect(() => {
     loadRecentBets()
+    loadActiveBets()
     loadPriceHistory()
     loadOnlineUsers()
     loadAllUsers()
@@ -79,10 +82,11 @@ export default function TradingInterface() {
     const interval = setInterval(() => {
       loadOnlineUsers()
       loadAllUsers()
+      loadActiveBets()
     }, 5000)
     
     return () => clearInterval(interval)
-  }, [loadRecentBets, loadPriceHistory, loadOnlineUsers, loadAllUsers])
+  }, [loadRecentBets, loadActiveBets, loadPriceHistory, loadOnlineUsers, loadAllUsers])
 
   useEffect(() => {
     // Convert price history to chart format
@@ -370,25 +374,35 @@ export default function TradingInterface() {
                    </TableRow>
                 </TableHeader>
                 <TableBody>
-                   {allUsers?.map((u) => (
+                   {allUsers?.map((u) => {
+                      const userActiveBet = activeBets.find(b => b.user_id === u.id)
+                      return (
                       <TableRow key={u.id} className="hover:bg-[#1e293b]/50 border-b border-[#1e293b]/50 h-10">
                          <TableCell className="py-1 font-medium text-xs">
-                            <div className="flex items-center gap-2">
-                               <Avatar className="h-5 w-5 border border-[#334155]">
-                                  <AvatarFallback className="text-[9px] bg-[#1e293b] text-[#94a3b8]">
-                                     {u.name?.substring(0, 1).toUpperCase()}
-                                  </AvatarFallback>
-                               </Avatar>
-                               <span className={u.id === user?.id ? "text-[#f59e0b]" : "text-[#cbd5e1]"}>
-                                  {u.name}
-                               </span>
+                            <div className="flex items-center justify-between pr-2">
+                                <div className="flex items-center gap-2 overflow-hidden">
+                                   <Avatar className="h-5 w-5 border border-[#334155] shrink-0">
+                                      <AvatarFallback className="text-[9px] bg-[#1e293b] text-[#94a3b8]">
+                                         {u.name?.substring(0, 1).toUpperCase()}
+                                      </AvatarFallback>
+                                   </Avatar>
+                                   <span className={`${u.id === user?.id ? "text-[#f59e0b]" : "text-[#cbd5e1]"} truncate`}>
+                                      {u.name}
+                                   </span>
+                                </div>
+                                {userActiveBet && (
+                                   <div className={`flex items-center gap-1 shrink-0 ${userActiveBet.prediction === 'up' ? 'text-[#10b981]' : 'text-[#ef4444]'}`}>
+                                      {userActiveBet.prediction === 'up' ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                                      <span className="text-[10px] font-bold">${userActiveBet.bet_amount}</span>
+                                   </div>
+                                )}
                             </div>
                          </TableCell>
                          <TableCell className="py-1 text-right font-mono text-xs text-[#94a3b8]">
                             ${u.balance?.toLocaleString()}
                          </TableCell>
                       </TableRow>
-                   ))}
+                   )})}
                 </TableBody>
              </Table>
           </ScrollArea>
