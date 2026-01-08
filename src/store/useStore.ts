@@ -32,6 +32,8 @@ interface AppState {
   recentBets: Bet[]
   priceHistory: GoldPrice[]
   countdown: number
+  winRate: number
+  onlineUsers: number
   loading: boolean
   initializeUser: (name: string) => Promise<void>
   loadUser: () => Promise<void>
@@ -41,6 +43,7 @@ interface AppState {
   subscribeToRounds: () => void
   loadRecentBets: () => Promise<void>
   loadPriceHistory: () => Promise<void>
+  loadOnlineUsers: () => Promise<void>
 }
 
 let countdownInterval: NodeJS.Timeout | null = null
@@ -54,6 +57,8 @@ export const useStore = create<AppState>((set, get) => ({
   recentBets: [],
   priceHistory: [],
   countdown: 15,
+  winRate: 0.95,
+  onlineUsers: 0,
   loading: true,
 
   loadUser: async () => {
@@ -101,12 +106,8 @@ export const useStore = create<AppState>((set, get) => ({
       if (roundData) {
         set({ currentRound: roundData })
         
-        // Calculate initial countdown
-        const startTime = new Date(roundData.start_time).getTime()
-        const now = Date.now()
-        const elapsed = Math.floor((now - startTime) / 1000)
-        const remaining = Math.max(0, 15 - elapsed)
-        set({ countdown: remaining })
+        // Don't calculate countdown here, wait for broadcast from admin
+        // Admin will send the accurate countdown via broadcast channel
 
         // Check if user has bet in this round
         if (userData) {
@@ -232,14 +233,8 @@ export const useStore = create<AppState>((set, get) => ({
           const newPrice = payload.new as GoldPrice
           set({ goldPrice: newPrice })
           
-          // Update price history
-          const { priceHistory } = get()
-          const updatedHistory = [...priceHistory, newPrice]
-          // Keep last 100 prices
-          if (updatedHistory.length > 100) {
-            updatedHistory.shift()
-          }
-          set({ priceHistory: updatedHistory })
+          // Don't update price history here - let broadcast handle it to avoid duplicates
+          // Price history will be updated via broadcast channel which includes countdown sync
         }
       )
       .subscribe((status, err) => {
@@ -260,7 +255,12 @@ export const useStore = create<AppState>((set, get) => ({
     broadcastChannel
       .on('broadcast', { event: 'game-state' }, (payload: any) => {
         console.log('📡 Broadcast received:', payload)
-        const { countdown, currentRound, goldPrice } = payload.payload
+        const { countdown, currentRound, goldPrice, winRate: broadcastWinRate } = payload.payload
+        
+        // Update winRate if provided
+        if (broadcastWinRate !== undefined) {
+          set({ winRate: broadcastWinRate })
+        }
         
         if (goldPrice !== undefined) {
           console.log('🔥 Gold Price from broadcast:', goldPrice, 'Type:', typeof goldPrice)
@@ -352,6 +352,20 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
+  loadOnlineUsers: async () => {
+    try {
+      const { count } = await supabase
+        .from('users')
+        .select('*', { count: 'exact', head: true })
+
+      if (count !== null) {
+        set({ onlineUsers: count })
+      }
+    } catch (error) {
+      console.error('Error loading online users:', error)
+    }
+  },
+
   subscribeToRounds: () => {
     // Subscribe to new rounds
     supabase
@@ -368,8 +382,8 @@ export const useStore = create<AppState>((set, get) => ({
           const newRound = payload.new as Round
           set({ 
             currentRound: newRound,
-            userBet: null,
-            countdown: 15
+            userBet: null
+            // Don't set countdown here, wait for broadcast from admin with accurate countdown
           })
         }
       )

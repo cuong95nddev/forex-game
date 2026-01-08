@@ -14,7 +14,10 @@ export default function TradingInterface() {
     recentBets, 
     loadRecentBets,
     priceHistory,
-    loadPriceHistory
+    loadPriceHistory,
+    winRate,
+    onlineUsers,
+    loadOnlineUsers
   } = useStore()
   
   const [betAmount, setBetAmount] = useState('100')
@@ -26,7 +29,15 @@ export default function TradingInterface() {
   useEffect(() => {
     loadRecentBets()
     loadPriceHistory()
-  }, [loadRecentBets, loadPriceHistory])
+    loadOnlineUsers()
+    
+    // Refresh online users every 5 seconds
+    const interval = setInterval(() => {
+      loadOnlineUsers()
+    }, 5000)
+    
+    return () => clearInterval(interval)
+  }, [loadRecentBets, loadPriceHistory, loadOnlineUsers])
 
   useEffect(() => {
     // Convert price history to chart format
@@ -35,6 +46,8 @@ export default function TradingInterface() {
         time: new Date(price.timestamp).getTime() / 1000,
         value: price.price
       }))
+      console.log('📊 Chart data:', chartData.slice(0, 5), 'Total:', chartData.length)
+      console.log('📊 Price values:', chartData.map(d => d.value).slice(0, 10))
       setChartPrices(chartData)
     }
   }, [priceHistory])
@@ -104,7 +117,7 @@ export default function TradingInterface() {
             <div className="flex items-center gap-2 text-sm">
               <Users size={16} className="text-gray-400" />
               <span className="text-gray-400">Online:</span>
-              <span className="text-green-400 font-semibold">2,456</span>
+              <span className="text-green-400 font-semibold">{onlineUsers}</span>
             </div>
           </div>
           
@@ -285,7 +298,7 @@ export default function TradingInterface() {
                     >
                       <TrendingUp size={24} />
                       <span>TĂNG</span>
-                      <span className="text-xs opacity-80">x1.95</span>
+                      <span className="text-xs opacity-80">x{(1 + winRate).toFixed(2)}</span>
                     </button>
                     
                     <button
@@ -295,12 +308,13 @@ export default function TradingInterface() {
                     >
                       <TrendingDown size={24} />
                       <span>GIẢM</span>
-                      <span className="text-xs opacity-80">x1.95</span>
+                      <span className="text-xs opacity-80">x{(1 + winRate).toFixed(2)}</span>
                     </button>
                   </div>
 
                   <div className="text-xs text-center text-gray-400 mt-4">
-                    Đặt lệnh trước khi hết thời gian
+                    Đặt lệnh trước khi hết thời gian<br/>
+                    <span className="text-yellow-400">🏆 Thắng nhận: x{(1 + winRate).toFixed(2)} (Đặt $100 → Nhận ${(100 * (1 + winRate)).toFixed(0)})</span>
                   </div>
                 </div>
               ) : (
@@ -319,7 +333,7 @@ export default function TradingInterface() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Thắng:</span>
-                    <span className="font-semibold text-green-400">x1.95 tiền cược</span>
+                    <span className="font-semibold text-green-400">x{(1 + winRate).toFixed(2)} tiền cược</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Thua:</span>

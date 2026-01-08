@@ -8,6 +8,15 @@ export default function AdminPanel() {
   const [isAutoMode, setIsAutoMode] = useState(true)
   const [currentRound, setCurrentRound] = useState<any>(null)
   const [countdown, setCountdown] = useState(15)
+  
+  // Settings
+  const [roundDuration, setRoundDuration] = useState(15) // seconds
+  const [priceUpdateInterval, setPriceUpdateInterval] = useState(1) // seconds
+  const [winRate, setWinRate] = useState(0.95) // 95% profit (0.95 = 95%)
+  const [settingsId, setSettingsId] = useState<string | null>(null)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  
   const [stats, setStats] = useState({
     totalRounds: 0,
     activePlayers: 0,
@@ -24,6 +33,7 @@ export default function AdminPanel() {
       broadcastChannel.current = supabase.channel('game-state')
       await broadcastChannel.current.subscribe()
       
+      await loadSettings()
       await loadCurrentPrice()
       await loadCurrentRound()
       await loadStats()
@@ -63,13 +73,83 @@ export default function AdminPanel() {
     if (isAutoMode) {
       interval = setInterval(() => {
         handleAutoUpdatePrice()
-      }, 1000) // Update mỗi 1 giây
+      }, priceUpdateInterval * 1000) // Sử dụng priceUpdateInterval
     }
 
     return () => {
       if (interval) clearInterval(interval)
     }
-  }, [isAutoMode, currentPrice])
+  }, [isAutoMode, currentPrice, priceUpdateInterval])
+
+  const loadSettings = async () => {
+    try {
+      const { data } = await supabase
+        .from('game_settings')
+        .select('*')
+        .limit(1)
+        .single()
+
+      if (data) {
+        setRoundDuration(data.round_duration)
+        setPriceUpdateInterval(data.price_update_interval)
+        setWinRate(data.win_rate)
+        setSettingsId(data.id)
+        setHasUnsavedChanges(false)
+      }
+    } catch (error) {
+      console.error('Error loading settings:', error)
+    }
+  }
+
+  const saveSettings = async () => {
+    if (!settingsId) return
+
+    setIsSaving(true)
+    try {
+      await supabase
+        .from('game_settings')
+        .update({
+          round_duration: roundDuration,
+          price_update_interval: priceUpdateInterval,
+          win_rate: winRate,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', settingsId)
+
+      setHasUnsavedChanges(false)
+      alert('✅ Đã lưu cấu hình thành công!')
+    } catch (error) {
+      console.error('Error saving settings:', error)
+      alert('❌ Lỗi khi lưu cấu hình!')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const applySettings = async () => {
+    if (!confirm('Áp dụng cấu hình mới sẽ kết thúc vòng hiện tại và bắt đầu vòng mới. Bạn có chắc chắn?')) {
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      // Save settings first
+      await saveSettings()
+
+      // Complete current round if exists
+      if (currentRound) {
+        await completeRound(currentRound)
+      }
+
+      // Settings will be applied automatically on next round
+      alert('✅ Đã áp dụng cấu hình! Vòng mới sẽ bắt đầu với cấu hình mới.')
+    } catch (error) {
+      console.error('Error applying settings:', error)
+      alert('❌ Lỗi khi áp dụng cấu hình!')
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   const loadCurrentPrice = async () => {
     const { data } = await supabase
@@ -80,10 +160,19 @@ export default function AdminPanel() {
       .single()
 
     if (data) {
-      setCurrentPrice(data.price)
-      setPriceChange(data.change)
-      currentPriceRef.current = data.price
-      priceChangeRef.current = data.change
+      // Validate price - if invalid, reset to 2000
+      const validPrice = (data.price >= 1000 && data.price <= 10000) ? data.price : 2000
+      if (validPrice !== data.price) {
+        console.warn('⚠️ Invalid price detected:', data.price, '- Resetting to 2000')
+        // Insert corrected price
+        await supabase
+          .from('gold_prices')
+          .insert({ price: 2000, change: 0 })
+      }
+      setCurrentPrice(validPrice)
+      setPriceChange(validPrice === 2000 ? 0 : data.change)
+      currentPriceRef.current = validPrice
+      priceChangeRef.current = validPrice === 2000 ? 0 : data.change
     } else {
       // Insert initial price if none exists
       console.log('No price data, creating initial price...')
@@ -109,7 +198,7 @@ export default function AdminPanel() {
     const updateCountdown = () => {
       const now = Date.now()
       const elapsed = Math.floor((now - startTime) / 1000)
-      const remaining = Math.max(0, 15 - elapsed)
+      const remaining = Math.max(0, roundDuration - elapsed)
       
       setCountdown(remaining)
       
@@ -123,7 +212,9 @@ export default function AdminPanel() {
           payload: {
             countdown: remaining,
             currentRound: round,
-            goldPrice: { price: latestPrice, change: change, timestamp: new Date().toISOString() }
+            goldPrice: { price: latestPrice, change: change, timestamp: new Date().toISOString() },
+            roundDuration: roundDuration, // Gửi roundDuration đến clients
+            winRate: winRate // Gửi winRate đến clients
           }
         })
       }
@@ -186,7 +277,12 @@ export default function AdminPanel() {
 
       if (!latestPrice) return
 
-      const endPrice = latestPrice.price
+      // Validate end price - if invalid, use 2000
+      let endPrice = latestPrice.price
+      if (endPrice < 1000 || endPrice > 10000 || isNaN(endPrice)) {
+        console.warn('⚠️ Invalid end price:', endPrice, '- Using 2000 instead')
+        endPrice = 2000
+      }
 
       // Update round
       await supabase
@@ -213,7 +309,7 @@ export default function AdminPanel() {
             (bet.prediction === 'down' && !priceWentUp)
 
           const result = userWon ? 'won' : 'lost'
-          const profit = userWon ? bet.bet_amount * 0.95 : 0
+          const profit = userWon ? bet.bet_amount * winRate : 0
           // Winners get their bet back + profit, losers already lost their bet when placing it
           const balanceChange = userWon ? bet.bet_amount + profit : 0
 
@@ -269,10 +365,21 @@ export default function AdminPanel() {
   }
 
   const handleAutoUpdatePrice = async () => {
+    // Use ref to get latest price value
+    let latestPrice = currentPriceRef.current
+    
+    // Safety check: if price is invalid, reset to 2000
+    if (latestPrice < 1000 || latestPrice > 10000 || isNaN(latestPrice)) {
+      console.warn('⚠️ Invalid price in ref:', latestPrice, '- Resetting to 2000')
+      latestPrice = 2000
+      currentPriceRef.current = 2000
+      setCurrentPrice(2000)
+    }
+    
     // Generate random price change (-2% to +2%)
     const changePercent = (Math.random() - 0.5) * 4
-    const change = currentPrice * (changePercent / 100)
-    const newPrice = currentPrice + change
+    const change = latestPrice * (changePercent / 100)
+    const newPrice = latestPrice + change
 
     await updatePrice(newPrice, change)
   }
@@ -310,7 +417,9 @@ export default function AdminPanel() {
           payload: {
             countdown,
             currentRound,
-            goldPrice: newPriceData || { price, change, timestamp: new Date().toISOString() }
+            goldPrice: newPriceData || { price, change, timestamp: new Date().toISOString() },
+            roundDuration: roundDuration,
+            winRate: winRate
           }
         })
       }
@@ -398,6 +507,90 @@ export default function AdminPanel() {
           </div>
         </div>
 
+        {/* Game Settings */}
+        <div className="bg-gradient-to-r from-purple-900/30 to-blue-900/30 rounded-lg p-6 border border-purple-500/30 mb-8">
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+            <span className="text-2xl">⚙️</span>
+            Cấu hình hệ thống
+          </h2>
+          <div className="grid grid-cols-3 gap-6">
+            <div>
+              <label className="block text-sm text-gray-300 mb-2">
+                Thời gian mỗi vòng (giây)
+              </label>
+              <input
+                type="number"
+                value={roundDuration}
+                onChange={(e) => {
+                  setRoundDuration(parseInt(e.target.value) || 15)
+                  setHasUnsavedChanges(true)
+                }}
+                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white"
+                min="5"
+                max="300"
+              />
+              <div className="text-xs text-gray-400 mt-1">Hiện tại: {roundDuration}s</div>
+            </div>
+            
+            <div>
+              <label className="block text-sm text-gray-300 mb-2">
+                Cập nhật giá mỗi (giây)
+              </label>
+              <input
+                type="number"
+                value={priceUpdateInterval}
+                onChange={(e) => {
+                  setPriceUpdateInterval(parseInt(e.target.value) || 1)
+                  setHasUnsavedChanges(true)
+                }}
+                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white"
+                min="1"
+                max="10"
+              />
+              <div className="text-xs text-gray-400 mt-1">Hiện tại: {priceUpdateInterval}s</div>
+            </div>
+            
+            <div>
+              <label className="block text-sm text-gray-300 mb-2">
+                Tỷ lệ thưởng khi thắng (%)
+              </label>
+              <input
+                type="number"
+                value={winRate * 100}
+                onChange={(e) => {
+                  setWinRate((parseFloat(e.target.value) || 95) / 100)
+                  setHasUnsavedChanges(true)
+                }}
+                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white"
+                min="50"
+                max="200"
+                step="5"
+              />
+              <div className="text-xs text-gray-400 mt-1">
+                Thắng: x{winRate.toFixed(2)} (Đặt $100 → Nhận ${(100 + 100 * winRate).toFixed(0)})
+              </div>
+            </div>
+          </div>
+          <div className="mt-4 bg-yellow-500/10 border border-yellow-500/30 rounded p-3 text-sm text-yellow-200">
+            ⚠️ Thay đổi cấu hình sẽ áp dụng cho vòng tiếp theo
+          </div>
+          
+          {/* Apply Button */}
+          <div className="mt-4">
+            <button
+              onClick={applySettings}
+              disabled={!hasUnsavedChanges || isSaving}
+              className={`w-full py-3 rounded-lg font-bold transition ${
+                hasUnsavedChanges 
+                  ? 'bg-green-600 hover:bg-green-700' 
+                  : 'bg-gray-600 cursor-not-allowed'
+              } disabled:opacity-50`}
+            >
+              {isSaving ? '⏳ Đang áp dụng...' : hasUnsavedChanges ? '🚀 Áp dụng' : '✅ Đã áp dụng'}
+            </button>
+          </div>
+        </div>
+
         {/* Current Round */}
         {currentRound && (
           <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 mb-8">
@@ -430,7 +623,9 @@ export default function AdminPanel() {
             <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-6">
               <div className="flex items-center gap-2">
                 <RefreshCw size={20} className="text-blue-400 animate-spin" />
-                <span className="font-semibold text-blue-400">Chế độ tự động đang bật - Cập nhật giá mỗi 1 giây</span>
+                <span className="font-semibold text-blue-400">
+                  Chế độ tự động đang bật - Cập nhật giá mỗi {priceUpdateInterval} giây
+                </span>
               </div>
             </div>
           )}
@@ -491,10 +686,11 @@ export default function AdminPanel() {
         <div className="mt-8 bg-gray-800/50 rounded-lg p-6 border border-gray-700">
           <h3 className="font-bold mb-3">Hướng dẫn:</h3>
           <ul className="space-y-2 text-sm text-gray-300">
-            <li>• <strong>Chế độ tự động:</strong> Giá sẽ tự động thay đổi ngẫu nhiên MỖI 1 GIÂY và phát real-time đến clients</li>
+            <li>• <strong>Chế độ tự động:</strong> Giá sẽ tự động thay đổi ngẫu nhiên MỖI {priceUpdateInterval} GIÂY và phát real-time đến clients</li>
             <li>• <strong>Chế độ thủ công:</strong> Bạn có thể điều chỉnh giá và cập nhật bằng tay</li>
-            <li>• Mỗi vòng betting kéo dài 15 giây</li>
-            <li>• Hệ thống tự động tính toán kết quả và trả thưởng khi hết 15 giây</li>
+            <li>• Mỗi vòng betting kéo dài <strong>{roundDuration} giây</strong></li>
+            <li>• Tỷ lệ thưởng hiện tại: <strong>{(winRate * 100).toFixed(0)}%</strong> (Đặt $100 thắng nhận ${(100 + 100 * winRate).toFixed(0)})</li>
+            <li>• Hệ thống tự động tính toán kết quả và trả thưởng khi hết {roundDuration} giây</li>
             <li>• Lịch sử giá được lưu để vẽ biểu đồ real-time</li>
           </ul>
         </div>
