@@ -35,7 +35,10 @@ export default function TradingInterface() {
     setLastWinAmount,
     lastLossAmount,
     setLastLossAmount,
-    isWaitingForNewGame
+    isWaitingForNewGame,
+    isGameCompleted,
+    leaderboard,
+    maxRound
   } = useStore()
   
   const [betAmount, setBetAmount] = useState('100')
@@ -178,6 +181,118 @@ export default function TradingInterface() {
   }
 
   // Show waiting state when admin is configuring new game or no active game
+  if (isGameCompleted && leaderboard.length > 0) {
+    return (
+      <div className="min-h-screen bg-[#131722] flex items-center justify-center p-4">
+        <div className="max-w-5xl w-full">
+          {/* Header Section */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-[#f7931a] to-[#f59e0b] mb-4 shadow-2xl shadow-[#f59e0b]/30">
+              <span className="text-5xl">🏆</span>
+            </div>
+            <h1 className="text-4xl font-bold text-white mb-2 tracking-tight">Game Completed</h1>
+            <p className="text-[#787b86] text-lg">Final results after {maxRound} rounds</p>
+          </div>
+          
+          {/* Leaderboard Container */}
+          <div className="bg-[#1e222d] rounded-lg border border-[#2a2e39] overflow-hidden shadow-2xl">
+            {/* Leaderboard Header */}
+            <div className="px-6 py-4 border-b border-[#2a2e39] bg-gradient-to-r from-[#1e222d] to-[#2a2e39]">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <span className="text-[#f59e0b]">★</span>
+                Final Standings
+                <Badge className="ml-auto bg-[#2962ff] text-white border-0 text-xs font-semibold">
+                  {leaderboard.length} Traders
+                </Badge>
+              </h2>
+            </div>
+            
+            <ScrollArea className="max-h-[540px]">
+              {/* Table Header */}
+              <div className="grid grid-cols-[80px_1fr_160px] gap-4 px-6 py-3 text-xs font-bold text-[#787b86] border-b border-[#2a2e39] bg-[#1e222d] sticky top-0 z-10">
+                <div>RANK</div>
+                <div>TRADER</div>
+                <div className="text-right">FINAL BALANCE</div>
+              </div>
+              
+              {/* Leaderboard Items */}
+              <div className="divide-y divide-[#2a2e39]/50">
+                {leaderboard.map((player, index) => {
+                  const isCurrentUser = player.id === user?.id
+                  const rankStyles = [
+                    { bg: 'from-[#f7931a]/10 via-[#f7931a]/5', border: 'border-l-[#f7931a]', text: 'text-[#f7931a]', rank: '🥇', glow: 'shadow-[#f7931a]/10' },
+                    { bg: 'from-[#c0c0c0]/10 via-[#c0c0c0]/5', border: 'border-l-[#c0c0c0]', text: 'text-[#c0c0c0]', rank: '🥈', glow: 'shadow-[#c0c0c0]/10' },
+                    { bg: 'from-[#cd7f32]/10 via-[#cd7f32]/5', border: 'border-l-[#cd7f32]', text: 'text-[#cd7f32]', rank: '🥉', glow: 'shadow-[#cd7f32]/10' },
+                  ]
+                  const rankStyle = rankStyles[index] || { 
+                    bg: 'from-transparent via-transparent', 
+                    border: 'border-l-[#2a2e39]', 
+                    text: 'text-[#787b86]', 
+                    rank: `${index + 1}`,
+                    glow: ''
+                  }
+                  
+                  return (
+                    <div 
+                      key={player.id} 
+                      className={`grid grid-cols-[80px_1fr_160px] gap-4 px-6 py-4 border-l-[3px] ${rankStyle.border} bg-gradient-to-r ${rankStyle.bg} to-transparent hover:bg-[#2a2e39]/20 transition-all ${isCurrentUser ? 'ring-1 ring-[#2962ff]/30' : ''} ${rankStyle.glow ? `shadow-lg ${rankStyle.glow}` : ''}`}
+                    >
+                      <div className="flex items-center">
+                        <div className={`text-xl font-bold ${rankStyle.text} tabular-nums flex items-center gap-2`}>
+                          <span>{rankStyle.rank}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center min-w-0">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={`font-bold text-[15px] truncate ${
+                              isCurrentUser ? 'text-[#2962ff]' : 'text-[#d1d4dc]'
+                            }`}>
+                              {player.name}
+                            </span>
+                            {isCurrentUser && (
+                              <Badge className="bg-[#2962ff] text-white text-[10px] px-1.5 py-0 h-4 font-bold">
+                                YOU
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-xs text-[#787b86] truncate font-mono">{player.fingerprint}</div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center justify-end">
+                        <div className="text-right">
+                          <div className={`text-lg font-bold tabular-nums ${
+                            index === 0 ? 'text-[#f7931a]' : 
+                            index === 1 ? 'text-[#c0c0c0]' : 
+                            index === 2 ? 'text-[#cd7f32]' : 
+                            isCurrentUser ? 'text-[#2962ff]' : 'text-[#d1d4dc]'
+                          }`}>
+                            ${player.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                          <div className="text-[10px] text-[#787b86] uppercase tracking-wider">USD</div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </ScrollArea>
+          </div>
+          
+          {/* Footer Message */}
+          <div className="text-center mt-6">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#1e222d] border border-[#2a2e39] text-[#787b86] text-sm">
+              <div className="w-2 h-2 rounded-full bg-[#f59e0b] animate-pulse"></div>
+              Waiting for admin to start a new game...
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (isWaitingForNewGame || !currentRound) {
     return (
       <div className="min-h-screen bg-[#0b0f13] flex items-center justify-center p-6">

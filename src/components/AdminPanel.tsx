@@ -32,7 +32,8 @@ export default function AdminPanel() {
     defaultUserBalance: 10000,
     minBetAmount: 10,
     maxBetAmount: 50000,
-    noBetPenalty: 0
+    noBetPenalty: 0,
+    maxRound: null as number | null
   })
   
   // Settings
@@ -43,9 +44,13 @@ export default function AdminPanel() {
   const [minBetAmount, setMinBetAmount] = useState(10)
   const [maxBetAmount, setMaxBetAmount] = useState(50000)
   const [noBetPenalty, setNoBetPenalty] = useState(0)
+  const [maxRound, setMaxRound] = useState<number | null>(null)
+  const [gameStatus, setGameStatus] = useState<'running' | 'completed'>('running')
   const [settingsId, setSettingsId] = useState<string | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [showLeaderboardDialog, setShowLeaderboardDialog] = useState(false)
+  const [leaderboard, setLeaderboard] = useState<any[]>([])
   
   const [stats, setStats] = useState({
     totalRounds: 0,
@@ -177,6 +182,8 @@ export default function AdminPanel() {
         setMinBetAmount(data.min_bet_amount || 10)
         setMaxBetAmount(data.max_bet_amount || 50000)
         setNoBetPenalty(data.no_bet_penalty || 0)
+        setMaxRound(data.max_round || null)
+        setGameStatus(data.game_status || 'running')
         setSettingsId(data.id)
         setHasUnsavedChanges(false)
       }
@@ -200,6 +207,8 @@ export default function AdminPanel() {
           min_bet_amount: minBetAmount,
           max_bet_amount: maxBetAmount,
           no_bet_penalty: noBetPenalty,
+          max_round: maxRound,
+          game_status: gameStatus,
           updated_at: new Date().toISOString()
         })
         .eq('id', settingsId)
@@ -295,17 +304,22 @@ export default function AdminPanel() {
         setCurrentRound(null)
       }
 
-      // Set waiting state
+      // Set waiting state and clear leaderboard
       setIsWaitingForConfig(true)
+      setShowLeaderboardDialog(false)
+      setLeaderboard([])
+      setGameStatus('running')
       
-      // Broadcast waiting state to all clients
+      // Broadcast waiting state to all clients (clears game completed state)
       if (broadcastChannel.current) {
         broadcastChannel.current.send({
           type: 'broadcast',
           event: 'game-state',
           payload: {
             adminSessionId: adminSessionId.current,
-            isWaiting: true
+            isWaiting: true,
+            currentRound: null,
+            countdown: 0
           }
         })
       }
@@ -352,6 +366,8 @@ export default function AdminPanel() {
             min_bet_amount: newGameConfig.minBetAmount,
             max_bet_amount: newGameConfig.maxBetAmount,
             no_bet_penalty: newGameConfig.noBetPenalty,
+            max_round: newGameConfig.maxRound,
+            game_status: 'running',
             updated_at: new Date().toISOString()
           })
           .eq('id', settingsId)
@@ -370,6 +386,9 @@ export default function AdminPanel() {
       pausedCountdown.current = null
       pausedRound.current = null
       setIsWaitingForConfig(false)
+      setShowLeaderboardDialog(false)
+      setLeaderboard([])
+      setGameStatus('running')
       
       // Initialize with fresh price
       await supabase.from('gold_prices').insert({ price: 2000, change: 0 })
@@ -377,14 +396,15 @@ export default function AdminPanel() {
       // Start first round
       await startNewRound(2000)
       
-      // Broadcast game started (clear waiting state)
+      // Broadcast game started (clear waiting state and completed state)
       if (broadcastChannel.current) {
         broadcastChannel.current.send({
           type: 'broadcast',
-          event: 'game-state',
+          event: 'game-started',
           payload: {
             adminSessionId: adminSessionId.current,
-            isWaiting: false
+            isWaiting: false,
+            isGameCompleted: false
           }
         })
       }
@@ -851,6 +871,12 @@ export default function AdminPanel() {
 
   const completeRound = async (round: any) => {
     try {
+      console.log('⏰ Completing round:', { 
+        roundNumber: round.round_number, 
+        maxRound: maxRound,
+        willEndGame: maxRound && round.round_number >= maxRound 
+      })
+      
       // Get latest price
       const { data: latestPrice } = await supabase
         .from('gold_prices')
@@ -945,9 +971,91 @@ export default function AdminPanel() {
         }
       }
 
-      // Start new round
-      await startNewRound(endPrice)
+      // Check if we've reached max round
+      if (maxRound && round.round_number >= maxRound) {
+        // Game completed! Show leaderboard
+        console.log('🏁 Max round reached! Ending game...', { maxRound, currentRound: round.round_number })
+        toast.info(`🏁 Max round ${maxRound} reached! Calculating final results...`)
+        await endGame()
+      } else {
+        // Start new round
+        await startNewRound(endPrice)
+      }
     } catch (error) {
+      console.error('Error completing round:', error)
+    }
+  }
+
+  const endGame = async () => {
+    try {
+      console.log('🏆 Ending game and generating leaderboard...')
+      
+      // Stop the game
+      setIsGameRunning(false)
+      if (countdownInterval.current) {
+        clearInterval(countdownInterval.current)
+        countdownInterval.current = null
+        countdownTimerId.current = null
+      }
+
+      // Update game status to completed
+      if (settingsId) {
+        await supabase
+          .from('game_settings')
+          .update({
+            game_status: 'completed',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', settingsId)
+        
+        setGameStatus('completed')
+      }
+
+      // Wait a moment for all database updates to complete
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      // Reload users to get final updated balances (after all bets and penalties processed)
+      const { data: users } = await supabase
+        .from('users')
+        .select('*')
+        .order('balance', { ascending: false })
+
+      console.log('📊 Leaderboard data:', users)
+
+      if (users && users.length > 0) {
+        setLeaderboard(users)
+        
+        // Clear current round
+        setCurrentRound(null)
+        setCountdown(0)
+
+        // Broadcast game completed to all clients
+        if (broadcastChannel.current) {
+          console.log('📡 Broadcasting game-completed event', { leaderboard: users, maxRound })
+          broadcastChannel.current.send({
+            type: 'broadcast',
+            event: 'game-completed',
+            payload: {
+              adminSessionId: adminSessionId.current,
+              leaderboard: users,
+              maxRound: maxRound
+            }
+          })
+        }
+
+        // Reload stats and users
+        await loadStats()
+        await loadUsers()
+
+        // Show leaderboard dialog
+        setShowLeaderboardDialog(true)
+        toast.success(`🏆 Game completed after ${maxRound} rounds! Check the leaderboard.`)
+      } else {
+        toast.error('❌ No users found for leaderboard!')
+      }
+    } catch (error) {
+      console.error('Error ending game:', error)
+      toast.error('❌ Failed to end game!')
     }
   }
 
@@ -1085,6 +1193,91 @@ export default function AdminPanel() {
 
   return (
     <div className="flex h-screen bg-[#0b0f13] text-white font-sans overflow-hidden select-none">
+      {/* Leaderboard Dialog */}
+      <Dialog open={showLeaderboardDialog} onOpenChange={setShowLeaderboardDialog}>
+        <DialogContent className="max-w-4xl bg-[#131722] border-[#2a2e39] text-white shadow-2xl">
+          <DialogHeader className="border-b border-[#2a2e39] pb-4">
+            <DialogTitle className="text-xl font-semibold text-white flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#f7931a] to-[#f59e0b] flex items-center justify-center shadow-lg">
+                <span className="text-2xl">🏆</span>
+              </div>
+              <div>
+                <div className="text-xl font-bold tracking-tight">Game Completed</div>
+                <div className="text-sm font-normal text-[#787b86] mt-0.5">Final Standings After {maxRound} Rounds</div>
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+          
+          <ScrollArea className="max-h-[520px]">
+            <div className="space-y-0 mt-2">
+              {/* Header */}
+              <div className="grid grid-cols-[60px_1fr_140px] gap-3 px-4 py-2 text-xs font-semibold text-[#787b86] border-b border-[#2a2e39] bg-[#1e222d]">
+                <div>RANK</div>
+                <div>TRADER</div>
+                <div className="text-right">BALANCE</div>
+              </div>
+              
+              {/* Leaderboard Items */}
+              {leaderboard.map((user, index) => {
+                const rankColors = [
+                  { bg: 'bg-gradient-to-r from-[#f7931a]/5 to-transparent', border: 'border-l-[#f7931a]', text: 'text-[#f7931a]', rank: '🥇' },
+                  { bg: 'bg-gradient-to-r from-[#c0c0c0]/5 to-transparent', border: 'border-l-[#c0c0c0]', text: 'text-[#c0c0c0]', rank: '🥈' },
+                  { bg: 'bg-gradient-to-r from-[#cd7f32]/5 to-transparent', border: 'border-l-[#cd7f32]', text: 'text-[#cd7f32]', rank: '🥉' },
+                ]
+                const rankStyle = rankColors[index] || { bg: 'bg-[#1e222d]/30', border: 'border-l-[#2a2e39]', text: 'text-[#787b86]', rank: `${index + 1}` }
+                
+                return (
+                  <div 
+                    key={user.id} 
+                    className={`grid grid-cols-[60px_1fr_140px] gap-3 px-4 py-3 border-l-2 ${rankStyle.border} ${rankStyle.bg} hover:bg-[#1e222d]/50 transition-colors border-b border-[#2a2e39]/50`}
+                  >
+                    <div className="flex items-center">
+                      <div className={`text-lg font-bold ${rankStyle.text} tabular-nums`}>
+                        {rankStyle.rank}
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center min-w-0">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-semibold text-[#d1d4dc] truncate text-sm">{user.name}</div>
+                        <div className="text-xs text-[#787b86] truncate font-mono">{user.fingerprint}</div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-end">
+                      <div className="text-right">
+                        <div className={`text-base font-bold tabular-nums ${index < 3 ? rankStyle.text : 'text-[#2962ff]'}`}>
+                          ${user.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                        <div className="text-[10px] text-[#787b86] uppercase tracking-wider mt-0.5">USD</div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </ScrollArea>
+
+          <DialogFooter className="border-t border-[#2a2e39] pt-4 mt-4">
+            <Button 
+              onClick={() => setShowLeaderboardDialog(false)} 
+              className="bg-[#2a2e39] hover:bg-[#363a45] text-[#d1d4dc] border-0 font-medium"
+            >
+              Close
+            </Button>
+            <Button 
+              onClick={() => {
+                setShowLeaderboardDialog(false)
+                prepareForNewGame()
+              }} 
+              className="bg-[#2962ff] hover:bg-[#1e53e5] text-white font-semibold shadow-lg shadow-[#2962ff]/20"
+            >
+              Start New Game
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Start New Game Dialog */}
       <Dialog open={showStartDialog} onOpenChange={setShowStartDialog}>
         <DialogContent className="max-w-2xl bg-[#0b0f13] border-[#1e293b] text-white">
@@ -1166,6 +1359,18 @@ export default function AdminPanel() {
                   onChange={(e) => setNewGameConfig({...newGameConfig, noBetPenalty: parseInt(e.target.value) || 0})}
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-[#94a3b8]">Max Rounds (leave empty for unlimited)</label>
+              <Input 
+                type="number" 
+                className="bg-[#1e293b] border-[#334155] text-white font-mono"
+                placeholder="Unlimited"
+                value={newGameConfig.maxRound || ''} 
+                onChange={(e) => setNewGameConfig({...newGameConfig, maxRound: e.target.value ? parseInt(e.target.value) : null})}
+              />
+              <p className="text-xs text-[#64748b]">Game will end after this many rounds and show the leaderboard</p>
             </div>
 
             <Alert className="mt-2 bg-[#ef4444]/10 border-[#ef4444]/20 text-[#ef4444]">
@@ -1319,7 +1524,13 @@ export default function AdminPanel() {
               {currentRound && (
               <div className="grid gap-3 md:grid-cols-4">
                 {[
-                  { label: 'Round', value: `#${currentRound.round_number}`, icon: RefreshCw },
+                  { 
+                    label: maxRound ? `Round (of ${maxRound})` : 'Round', 
+                    value: `#${currentRound.round_number}`, 
+                    sub: maxRound ? `${Math.round((currentRound.round_number / maxRound) * 100)}% complete` : undefined,
+                    icon: RefreshCw,
+                    color: maxRound && currentRound.round_number >= maxRound ? 'text-[#f59e0b]' : undefined
+                  },
                   { label: 'Players', value: stats.activePlayers, icon: Users },
                   { label: 'Bets', value: stats.totalBets, icon: Database },
                   { label: 'Price', value: `$${currentPrice.toFixed(2)}`, sub: `${priceChange >= 0 ? '+' : ''}${priceChange.toFixed(2)}`, icon: TrendingUp, color: priceChange >= 0 ? 'text-[#10b981]' : 'text-[#ef4444]' },
@@ -1612,6 +1823,11 @@ export default function AdminPanel() {
                     <div className="space-y-2">
                       <label className="text-xs font-bold uppercase tracking-wider text-[#94a3b8]">Win Rate (0.95 = 95%)</label>
                        <Input className="bg-[#1e293b] border-[#334155] text-white" type="number" value={(winRate * 100).toFixed(0)} onChange={(e) => { setWinRate(parseFloat(e.target.value)/100 || 0.95); setHasUnsavedChanges(true); }} />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-[#94a3b8]">Max Rounds (empty = unlimited)</label>
+                      <Input className="bg-[#1e293b] border-[#334155] text-white" type="number" placeholder="Unlimited" value={maxRound || ''} onChange={(e) => { setMaxRound(e.target.value ? parseInt(e.target.value) : null); setHasUnsavedChanges(true); }} />
+                      <p className="text-xs text-[#64748b]">Game ends and shows leaderboard after this many rounds</p>
                     </div>
                 </div>
               </div>

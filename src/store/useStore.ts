@@ -43,6 +43,9 @@ interface AppState {
   lastWinAmount: number | null
   isWaitingForNewGame: boolean
   isAdminOnline: boolean
+  isGameCompleted: boolean
+  leaderboard: User[]
+  maxRound: number | null
   setLastWinAmount: (amount: number | null) => void
   lastLossAmount: number | null
   setLastLossAmount: (amount: number | null) => void
@@ -91,6 +94,9 @@ export const useStore = create<AppState>((set, get) => ({
   loading: false, // Changed default to false
   isWaitingForNewGame: false,
   isAdminOnline: false,
+  isGameCompleted: false,
+  leaderboard: [],
+  maxRound: null,
 
   setLastWinAmount: (amount) => set({ lastWinAmount: amount }),
   setLastLossAmount: (amount) => set({ lastLossAmount: amount }),
@@ -357,7 +363,15 @@ export const useStore = create<AppState>((set, get) => ({
         if (isWaiting !== undefined) {
           if (isWaiting) {
             // Clear current round when waiting for new game
-            set({ isWaitingForNewGame: isWaiting, currentRound: null, userBet: null, countdown: 0 })
+            set({ 
+              isWaitingForNewGame: isWaiting, 
+              currentRound: null, 
+              userBet: null, 
+              countdown: 0,
+              isGameCompleted: false,
+              leaderboard: [],
+              maxRound: null
+            })
             return // Don't process other updates when in waiting state
           } else {
             // When no longer waiting, clear waiting state but continue processing other updates
@@ -465,11 +479,78 @@ export const useStore = create<AppState>((set, get) => ({
           userBet: null, 
           countdown: 0, 
           isWaitingForNewGame: false,
-          goldPrice: null 
+          goldPrice: null,
+          isGameCompleted: false,
+          leaderboard: []
         })
         toast.error(payload.payload.message || 'System has been reset. Please login again.')
         // Reset admin session
         acceptedAdminSession = null
+      })
+      .on('broadcast', { event: 'game-completed' }, (payload: any) => {
+        // Game has completed - show leaderboard
+        console.log('Game completed:', payload.payload)
+        const { leaderboard, maxRound } = payload.payload
+        
+        set({ 
+          isGameCompleted: true,
+          leaderboard: leaderboard || [],
+          maxRound: maxRound || null,
+          currentRound: null,
+          userBet: null,
+          countdown: 0
+        })
+        
+        // Show confetti for winners
+        const currentUser = get().user
+        if (currentUser && leaderboard && leaderboard.length > 0) {
+          const userRank = leaderboard.findIndex((u: User) => u.id === currentUser.id)
+          if (userRank === 0) {
+            // Winner - show gold confetti
+            confetti({
+              particleCount: 200,
+              spread: 100,
+              origin: { y: 0.6 },
+              colors: ['#f59e0b', '#fbbf24', '#fcd34d']
+            })
+            toast.success(`🏆 Congratulations! You won the game!`)
+          } else if (userRank === 1) {
+            // Second place - silver confetti
+            confetti({
+              particleCount: 150,
+              spread: 80,
+              origin: { y: 0.6 },
+              colors: ['#94a3b8', '#cbd5e1', '#e2e8f0']
+            })
+            toast.success(`🥈 Great job! You finished in 2nd place!`)
+          } else if (userRank === 2) {
+            // Third place - bronze confetti
+            confetti({
+              particleCount: 100,
+              spread: 70,
+              origin: { y: 0.6 },
+              colors: ['#cd7f32', '#d4a574', '#e5c29f']
+            })
+            toast.success(`🥉 Well done! You finished in 3rd place!`)
+          } else if (userRank >= 0) {
+            toast.info(`Game completed! You finished in position #${userRank + 1}`)
+          }
+        } else {
+          toast.info(`🏁 Game completed after ${maxRound} rounds!`)
+        }
+      })
+      .on('broadcast', { event: 'game-started' }, (payload: any) => {
+        // New game started - clear completed state
+        console.log('New game started:', payload.payload)
+        
+        set({ 
+          isGameCompleted: false,
+          leaderboard: [],
+          maxRound: null,
+          isWaitingForNewGame: false
+        })
+        
+        toast.success('🎮 New game has started!')
       })
       .subscribe()
   },
