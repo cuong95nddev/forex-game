@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { NameInput } from '../components/NameInput'
 import TradingInterface from '../components/TradingInterface'
 import { useStore } from '../store/useStore'
+import { toast } from 'sonner'
 
 export default function HomePage() {
   const { user, loading, loadUser, initializeUser, subscribeToGoldPrice, subscribeToBroadcast, subscribeToRounds } = useStore()
@@ -27,7 +28,7 @@ export default function HomePage() {
     } catch (error: any) {
       console.error('Error creating user:', error)
       const errorMessage = error?.message || 'Unknown error'
-      alert(`Có lỗi xảy ra khi tạo người dùng!\n\nChi tiết: ${errorMessage}`)
+      toast.error(`Có lỗi xảy ra khi tạo người dùng!\n\nChi tiết: ${errorMessage}`)
     }
   }
 

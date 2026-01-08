@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { Play, Pause, TrendingUp, TrendingDown, RefreshCw, Settings, Users, Database, AlertTriangle, DollarSign, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
 
 export default function AdminPanel() {
   const [currentPrice, setCurrentPrice] = useState(2000)
@@ -152,10 +153,10 @@ export default function AdminPanel() {
         .eq('id', settingsId)
 
       setHasUnsavedChanges(false)
-      alert('✅ Đã lưu cấu hình thành công!')
+      toast.success('✅ Đã lưu cấu hình thành công!')
     } catch (error) {
       console.error('Error saving settings:', error)
-      alert('❌ Lỗi khi lưu cấu hình!')
+      toast.error('❌ Lỗi khi lưu cấu hình!')
     } finally {
       setIsSaving(false)
     }
@@ -177,10 +178,10 @@ export default function AdminPanel() {
       }
 
       // Settings will be applied automatically on next round
-      alert('✅ Đã áp dụng cấu hình! Vòng mới sẽ bắt đầu với cấu hình mới.')
+      toast.success('✅ Đã áp dụng cấu hình! Vòng mới sẽ bắt đầu với cấu hình mới.')
     } catch (error) {
       console.error('Error applying settings:', error)
-      alert('❌ Lỗi khi áp dụng cấu hình!')
+      toast.error('❌ Lỗi khi áp dụng cấu hình!')
     } finally {
       setIsSaving(false)
     }
@@ -347,10 +348,10 @@ export default function AdminPanel() {
       
       await loadUsers()
       setEditingUser(null)
-      alert('Balance updated successfully')
+      toast.success('Balance updated successfully')
     } catch (error) {
       console.error('Error updating user balance:', error)
-      alert('Failed to update balance')
+      toast.error('Failed to update balance')
     }
   }
 
@@ -374,10 +375,10 @@ export default function AdminPanel() {
       
       await loadUsers()
       await loadStats()
-      alert('User deleted successfully')
+      toast.success('User deleted successfully')
     } catch (error) {
       console.error('Error deleting user:', error)
-      alert('Failed to delete user')
+      toast.error('Failed to delete user')
     }
   }
 
@@ -402,10 +403,10 @@ export default function AdminPanel() {
       currentPriceRef.current = 2000
       priceChangeRef.current = 0
       
-      alert('Price history cleaned successfully')
+      toast.success('Price history cleaned successfully')
     } catch (error) {
       console.error('Error cleaning price history:', error)
-      alert('Failed to clean price history')
+      toast.error('Failed to clean price history')
     }
   }
 
@@ -442,10 +443,10 @@ export default function AdminPanel() {
       await loadStats()
       await loadUsers()
       
-      alert('All data has been reset successfully. You can restart the system now.')
+      toast.success('All data has been reset successfully. You can restart the system now.')
     } catch (error) {
       console.error('Error resetting data:', error)
-      alert('Failed to reset data')
+      toast.error('Failed to reset data')
     }
   }
 
@@ -465,10 +466,10 @@ export default function AdminPanel() {
         .lt('end_time', oneDayAgo.toISOString())
       
       await loadStats()
-      alert('Old rounds cleaned successfully')
+      toast.success('Old rounds cleaned successfully')
     } catch (error) {
       console.error('Error cleaning old rounds:', error)
-      alert('Failed to clean old rounds')
+      toast.error('Failed to clean old rounds')
     }
   }
 

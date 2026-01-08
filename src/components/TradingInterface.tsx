@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { TrendingUp, TrendingDown, Clock, DollarSign, Users } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import TradingChart from './TradingChart'
+import { toast } from 'sonner'
 
 export default function TradingInterface() {
   const { 
@@ -25,7 +26,25 @@ export default function TradingInterface() {
     time: number
     value: number
   }>>([])
+  const [priceFlash, setPriceFlash] = useState<'up' | 'down' | null>(null)
+  const lastPriceRef = useRef<number | null>(null)
 
+  // Flash animation when price changes
+  useEffect(() => {
+    if (goldPrice && lastPriceRef.current !== null) {
+      if (goldPrice.price > lastPriceRef.current) {
+        setPriceFlash('up')
+      } else if (goldPrice.price < lastPriceRef.current) {
+        setPriceFlash('down')
+      }
+      
+      const timer = setTimeout(() => setPriceFlash(null), 600)
+      return () => clearTimeout(timer)
+    }
+    if (goldPrice) {
+      lastPriceRef.current = goldPrice.price
+    }
+  }, [goldPrice?.price])
   useEffect(() => {
     loadRecentBets()
     loadPriceHistory()
@@ -49,6 +68,29 @@ export default function TradingInterface() {
       setChartPrices(chartData)
     }
   }, [priceHistory])
+  
+  // Update chart in real-time as goldPrice changes
+  useEffect(() => {
+    if (goldPrice && currentRound) {
+      setChartPrices(prev => {
+        const newPoint = {
+          time: new Date(goldPrice.timestamp).getTime() / 1000,
+          value: goldPrice.price
+        }
+        
+        // Add new price point
+        const updated = [...prev, newPoint]
+        
+        // Keep only prices from current round (or last 50 points)
+        const maxPoints = 50
+        if (updated.length > maxPoints) {
+          return updated.slice(-maxPoints)
+        }
+        
+        return updated
+      })
+    }
+  }, [goldPrice, currentRound])
 
   // Show loading state if no user or goldPrice
   if (!user || !goldPrice) {
@@ -65,12 +107,12 @@ export default function TradingInterface() {
   const handleBet = async (prediction: 'up' | 'down') => {
     const amount = parseFloat(betAmount)
     if (isNaN(amount) || amount <= 0) {
-      alert('Số tiền không hợp lệ!')
+      toast.error('Số tiền không hợp lệ!')
       return
     }
     
     if (!user || amount > user.balance) {
-      alert('Số dư không đủ!')
+      toast.error('Số dư không đủ!')
       return
     }
 
@@ -139,12 +181,15 @@ export default function TradingInterface() {
                 <div>
                   <div className="text-sm text-gray-400 mb-1">XAU/USD - Gold Spot</div>
                   <div className="flex items-center gap-4">
-                    <div className="text-3xl font-bold">
+                    <div className={`text-3xl font-bold transition-all duration-300 ${
+                      priceFlash === 'up' ? 'text-green-400 scale-110' : 
+                      priceFlash === 'down' ? 'text-red-400 scale-110' : ''
+                    }`}>
                       ${goldPrice?.price.toFixed(2) || '0.00'}
                     </div>
-                    <div className={`flex items-center gap-1 px-3 py-1 rounded ${
+                    <div className={`flex items-center gap-1 px-3 py-1 rounded transition-all ${
                       isPositive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                    }`}>
+                    } ${priceFlash ? 'animate-pulse' : ''}`}>
                       {isPositive ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
                       <span className="font-semibold">
                         {isPositive ? '+' : ''}{priceChange.toFixed(2)} ({isPositive ? '+' : ''}{priceChangePercent}%)

@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { supabase, type User, type GoldPrice } from '../lib/supabase'
 import { getFingerprint } from '../lib/fingerprint'
 import { initializeDatabase } from '../lib/initDb'
+import { toast } from 'sonner'
 
 interface Round {
   id: string
@@ -181,22 +182,22 @@ export const useStore = create<AppState>((set, get) => ({
     const { user, currentRound, countdown } = get()
     
     if (!user || !currentRound) {
-      alert('Không thể đặt cược ngay bây giờ!')
+      toast.error('Không thể đặt cược ngay bây giờ!')
       return false
     }
 
     if (countdown <= 0) {
-      alert('Hết thời gian đặt cược cho vòng này!')
+      toast.warning('Hết thời gian đặt cược cho vòng này!')
       return false
     }
 
     if (user.balance < amount) {
-      alert('Số dư không đủ!')
+      toast.error('Số dư không đủ!')
       return false
     }
 
     if (amount < 100) {
-      alert('Số tiền cược tối thiểu là $100!')
+      toast.warning('Số tiền cược tối thiểu là $100!')
       return false
     }
 
@@ -227,7 +228,7 @@ export const useStore = create<AppState>((set, get) => ({
           .from('users')
           .update({ balance: user.balance })
           .eq('id', user.id)
-        alert('Không thể đặt cược! Có thể bạn đã đặt cược trong vòng này rồi.')
+        toast.error('Không thể đặt cược! Có thể bạn đã đặt cược trong vòng này rồi.')
         return false
       }
 
@@ -489,9 +490,9 @@ export const useStore = create<AppState>((set, get) => ({
 
             // Show result
             if (updatedBet.result === 'won') {
-              alert(`🎉 Chúc mừng! Bạn đã thắng $${updatedBet.profit.toFixed(2)}!`)
+              toast.success(`🎉 Chúc mừng! Bạn đã thắng $${updatedBet.profit.toFixed(2)}!`)
             } else if (updatedBet.result === 'lost') {
-              alert(`😔 Bạn đã thua $${updatedBet.bet_amount.toFixed(2)}`)
+              toast.error(`😔 Bạn đã thua $${updatedBet.bet_amount.toFixed(2)}`)
             }
           }
         }
