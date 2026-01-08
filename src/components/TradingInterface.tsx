@@ -27,6 +27,7 @@ export default function TradingInterface() {
     loadPriceHistory,
     winRate,
     onlineUsers,
+    onlineUsersList,
     loadOnlineUsers,
     allUsers,
     loadAllUsers,
@@ -179,8 +180,8 @@ export default function TradingInterface() {
   // Show waiting state when admin is configuring new game or no active game
   if (isWaitingForNewGame || !currentRound) {
     return (
-      <div className="min-h-screen bg-[#0b0f13] flex items-center justify-center">
-        <div className="text-center space-y-6 max-w-md px-6">
+      <div className="min-h-screen bg-[#0b0f13] flex items-center justify-center p-6">
+        <div className="text-center space-y-6 max-w-2xl w-full px-6">
           <div className="relative">
             <div className="animate-spin rounded-full h-20 w-20 border-4 border-[#f59e0b]/20 border-t-[#f59e0b] mx-auto"></div>
             <Clock className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-8 w-8 text-[#f59e0b]" />
@@ -192,6 +193,53 @@ export default function TradingInterface() {
             </p>
             <p className="text-[#64748b] text-sm mt-4">Game will start shortly</p>
           </div>
+          
+          {/* Online Users List */}
+          <div className="mt-8 bg-[#1e293b] rounded-lg border border-[#334155] p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Users className="h-5 w-5 text-[#f59e0b]" />
+              <h3 className="text-lg font-bold text-white">
+                Players Online ({onlineUsersList.length})
+              </h3>
+            </div>
+            
+            {onlineUsersList.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto">
+                {onlineUsersList.map((onlineUser) => (
+                  <div 
+                    key={onlineUser.id}
+                    className="flex items-center gap-3 bg-[#0b0f13] rounded-lg p-3 border border-[#334155]/50"
+                  >
+                    <Avatar className="h-10 w-10 bg-[#f59e0b]/10 border border-[#f59e0b]/20">
+                      <AvatarFallback className="text-[#f59e0b] font-bold">
+                        {onlineUser.name.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-semibold truncate">
+                        {onlineUser.name}
+                        {onlineUser.id === user?.id && (
+                          <span className="ml-2 text-xs text-[#f59e0b]">(You)</span>
+                        )}
+                      </p>
+                      <p className="text-[#64748b] text-sm">
+                        ${onlineUser.balance.toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="flex-shrink-0">
+                      <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Users className="h-12 w-12 text-[#334155] mx-auto mb-2" />
+                <p className="text-[#64748b]">No players online yet</p>
+              </div>
+            )}
+          </div>
+          
           <div className="flex justify-center gap-2">
             <div className="h-2 w-2 rounded-full bg-[#f59e0b] animate-bounce" style={{ animationDelay: '0ms' }}></div>
             <div className="h-2 w-2 rounded-full bg-[#f59e0b] animate-bounce" style={{ animationDelay: '150ms' }}></div>

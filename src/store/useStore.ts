@@ -13,6 +13,7 @@ interface Round {
   start_time: string
   end_time: string | null
   status: 'active' | 'completed'
+  allowed_users?: string[] // Array of user IDs allowed to participate
 }
 
 interface Bet {
@@ -37,6 +38,7 @@ interface AppState {
   countdown: number
   winRate: number
   onlineUsers: number
+  onlineUsersList: User[]
   loading: boolean
   allUsers: User[]
   lastWinAmount: number | null
@@ -83,6 +85,7 @@ export const useStore = create<AppState>((set, get) => ({
   countdown: 15,
   winRate: 0.95,
   onlineUsers: 0,
+  onlineUsersList: [],
   allUsers: [],
   lastWinAmount: null,
   lastLossAmount: null,
@@ -116,6 +119,26 @@ export const useStore = create<AppState>((set, get) => ({
         return
       }
 
+      // Load current round FIRST before setting user
+      const { data: roundData } = await supabase
+        .from('rounds')
+        .select('*')
+        .eq('status', 'active')
+        .order('round_number', { ascending: false })
+        .limit(1)
+        .single()
+
+      // Check if user is allowed to participate BEFORE setting the user
+      if (userData && roundData && roundData.allowed_users !== undefined && roundData.allowed_users !== null) {
+        if (!roundData.allowed_users.includes(userData.id)) {
+          console.log('User not in allowed list for this round. Allowed:', roundData.allowed_users, 'User:', userData.id)
+          // Don't set user - this will show NameInput which will show the locked screen
+          set({ loading: false })
+          return
+        }
+      }
+
+      // Only set user if they passed the allowed check (or no check needed)
       if (userData) {
         set({ user: userData })
       } else {
@@ -132,15 +155,6 @@ export const useStore = create<AppState>((set, get) => ({
       if (priceData) {
         set({ goldPrice: priceData })
       }
-
-      // Load current round
-      const { data: roundData } = await supabase
-        .from('rounds')
-        .select('*')
-        .eq('status', 'active')
-        .order('round_number', { ascending: false })
-        .limit(1)
-        .single()
 
       if (roundData) {
         set({ currentRound: roundData, countdown: 0 }) // Set countdown to 0, wait for broadcast from admin
@@ -170,6 +184,19 @@ export const useStore = create<AppState>((set, get) => ({
   initializeUser: async (name: string) => {
     try {
       const fingerprint = await getFingerprint()
+      
+      // Check if game is already active - prevent new users from joining mid-game
+      const { data: activeRound } = await supabase
+        .from('rounds')
+        .select('*')
+        .eq('status', 'active')
+        .order('round_number', { ascending: false })
+        .limit(1)
+        .single()
+      
+      if (activeRound) {
+        throw new Error('Cannot join while a game is in progress. Please wait for the current round to finish.')
+      }
       
       // Get default balance from settings
       const { data: settings } = await supabase
@@ -309,42 +336,59 @@ export const useStore = create<AppState>((set, get) => ({
         
         // Handle waiting state
         if (isWaiting !== undefined) {
-          set({ isWaitingForNewGame: isWaiting })
           if (isWaiting) {
             // Clear current round when waiting for new game
-            set({ currentRound: null, userBet: null, countdown: 0 })
+            set({ isWaitingForNewGame: isWaiting, currentRound: null, userBet: null, countdown: 0 })
             return // Don't process other updates when in waiting state
+          } else {
+            // When no longer waiting, clear waiting state but continue processing other updates
+            set({ isWaitingForNewGame: isWaiting })
           }
         }
         
-        // If this is from a new admin session, accept it (first one wins, or reset on new round)
-        if (adminSessionId) {
-          if (!acceptedAdminSession) {
-            acceptedAdminSession = adminSessionId
-          } else if (acceptedAdminSession !== adminSessionId) {
-            // Ignore broadcasts from other admin sessions
-            return
+        // Update current round if provided - reset admin lock on new round
+        if ('currentRound' in payload.payload) {
+          const oldRound = get().currentRound
+          
+          // If currentRound is null, always accept it to clear the game state (e.g., when deleting game)
+          if (currentRound === null) {
+            set({ currentRound: null, userBet: null, countdown: 0, isWaitingForNewGame: false })
+            // Reset admin session when game is cleared
+            acceptedAdminSession = null
+            return // No need to process further updates when clearing game
+          }
+          
+          // For non-null rounds, check admin session
+          if (adminSessionId) {
+            if (!acceptedAdminSession) {
+              acceptedAdminSession = adminSessionId
+            } else if (acceptedAdminSession !== adminSessionId) {
+              // Ignore broadcasts from other admin sessions
+              return
+            }
+          }
+          
+          if (oldRound && currentRound && currentRound.id !== oldRound.id) {
+            // New round started, reset admin lock to allow any admin
+            acceptedAdminSession = adminSessionId || null
+          }
+          
+          set({ currentRound })
+        } else {
+          // No currentRound in payload, check admin session for other updates
+          if (adminSessionId) {
+            if (!acceptedAdminSession) {
+              acceptedAdminSession = adminSessionId
+            } else if (acceptedAdminSession !== adminSessionId) {
+              // Ignore broadcasts from other admin sessions
+              return
+            }
           }
         }
         
         // Update countdown from admin broadcast - this is the source of truth
         if (countdown !== undefined) {
           set({ countdown })
-        }
-        
-        // Update current round if provided - reset admin lock on new round
-        if ('currentRound' in payload.payload) {
-          const oldRound = get().currentRound
-          if (oldRound && currentRound && currentRound.id !== oldRound.id) {
-            // New round started, reset admin lock to allow any admin
-            acceptedAdminSession = adminSessionId || null
-          }
-          // If currentRound is null, clear userBet as well
-          if (currentRound === null) {
-            set({ currentRound: null, userBet: null })
-          } else {
-            set({ currentRound })
-          }
         }
         
         // Update winRate if provided
@@ -442,17 +486,26 @@ export const useStore = create<AppState>((set, get) => ({
 
   loadOnlineUsers: async () => {
     try {
-      // Count users active in last 30 seconds
-      const { count } = await supabase
+      // Get users active in last 5 seconds with user details
+      const { data: presenceData } = await supabase
         .from('presence')
-        .select('*', { count: 'exact', head: true })
+        .select('user_id, users(id, name, balance)')
         .eq('session_type', 'user')
-        .gte('last_seen', new Date(Date.now() - 30000).toISOString())
+        .gte('last_seen', new Date(Date.now() - 1000).toISOString())
 
-      if (count !== null) {
-        set({ onlineUsers: count })
+      if (presenceData) {
+        // Extract user details and remove duplicates
+        const userMap = new Map()
+        presenceData.forEach((item: any) => {
+          if (item.users) {
+            userMap.set(item.users.id, item.users)
+          }
+        })
+        const onlineUsersList = Array.from(userMap.values())
+        set({ onlineUsers: onlineUsersList.length, onlineUsersList })
       }
     } catch (error) {
+      console.error('Failed to load online users:', error)
     }
   },
 
@@ -515,8 +568,28 @@ export const useStore = create<AppState>((set, get) => ({
         },
         (payload) => {
           const updatedRound = payload.new as Round
-          if (updatedRound.status === 'completed') {
+          const { currentRound } = get()
+          
+          // Only update if it's the current round being completed
+          // Don't set a completed round as current round if we don't have one
+          if (updatedRound.status === 'completed' && currentRound && currentRound.id === updatedRound.id) {
             set({ currentRound: updatedRound })
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'rounds',
+        },
+        (payload) => {
+          const deletedRound = payload.old as Round
+          const { currentRound } = get()
+          // If the deleted round is the current round, clear it
+          if (currentRound && currentRound.id === deletedRound.id) {
+            set({ currentRound: null, userBet: null, isWaitingForNewGame: false })
           }
         }
       )
@@ -654,7 +727,7 @@ export const useStore = create<AppState>((set, get) => ({
           .from('presence')
           .select('*')
           .eq('session_type', 'admin')
-          .gte('last_seen', new Date(Date.now() - 15000).toISOString()) // Active in last 15 seconds
+          .gte('last_seen', new Date(Date.now() - 1000).toISOString()) // Active in last 3 seconds
           .limit(1)
           .single()
 
@@ -668,7 +741,7 @@ export const useStore = create<AppState>((set, get) => ({
     // Initial check
     checkAdminPresence()
 
-    // Subscribe to presence changes
+    // Subscribe to presence changes - focus on admin session type
     presenceChannel = supabase
       .channel('presence-changes')
       .on(
@@ -677,15 +750,17 @@ export const useStore = create<AppState>((set, get) => ({
           event: '*',
           schema: 'public',
           table: 'presence',
+          filter: 'session_type=eq.admin'
         },
         () => {
+          // Immediately check admin presence when any change occurs
           checkAdminPresence()
         }
       )
       .subscribe()
 
-    // Poll every 5 seconds as backup
-    const presenceCheckInterval = setInterval(checkAdminPresence, 5000)
+    // Poll every 500ms for immediate detection
+    const presenceCheckInterval = setInterval(checkAdminPresence, 500)
 
     // Clean up on unmount
     return () => {
@@ -739,7 +814,7 @@ export const useStore = create<AppState>((set, get) => ({
           } catch (error) {
             console.error('Failed to update user presence:', error)
           }
-        }, 2000) // Update every 2 seconds
+        }, 500)
       }
     } catch (error) {
       console.error('Failed to initialize user presence:', error)

@@ -5,7 +5,7 @@ import { useStore } from '../store/useStore'
 import { toast } from 'sonner'
 
 export default function HomePage() {
-  const { user, loading, loadUser, initializeUser, subscribeToGoldPrice, subscribeToBroadcast, subscribeToRounds, subscribeToUsers, subscribeToAdminPresence, updateUserPresence, isAdminOnline } = useStore()
+  const { user, loading, loadUser, initializeUser, subscribeToGoldPrice, subscribeToBroadcast, subscribeToRounds, subscribeToUsers, subscribeToAdminPresence, updateUserPresence, isAdminOnline, loadOnlineUsers } = useStore()
 
   useEffect(() => {
     console.log('HomePage mounted, loading data...')
@@ -17,9 +17,14 @@ export default function HomePage() {
     subscribeToRounds()
     subscribeToAdminPresence()
     
+    // Load online users periodically
+    loadOnlineUsers()
+    const onlineUsersInterval = setInterval(loadOnlineUsers, 1000) // Update every 1 second
+    
     // Cleanup function to unsubscribe when component unmounts
     return () => {
       console.log('HomePage unmounting, cleaning up subscriptions...')
+      clearInterval(onlineUsersInterval)
     }
   }, [])
 

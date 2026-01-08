@@ -17,6 +17,12 @@ export default function AdminPanel() {
   const [currentRound, setCurrentRound] = useState<any>(null)
   const [countdown, setCountdown] = useState(15)
   const [showStartDialog, setShowStartDialog] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [showDeleteUserDialog, setShowDeleteUserDialog] = useState(false)
+  const [userToDelete, setUserToDelete] = useState<string | null>(null)
+  const [showCleanPricesDialog, setShowCleanPricesDialog] = useState(false)
+  const [showResetAllDialog, setShowResetAllDialog] = useState(false)
+  const [showCleanRoundsDialog, setShowCleanRoundsDialog] = useState(false)
   const [isGameRunning, setIsGameRunning] = useState(false)
   const [isWaitingForConfig, setIsWaitingForConfig] = useState(false)
   const [newGameConfig, setNewGameConfig] = useState({
@@ -197,10 +203,6 @@ export default function AdminPanel() {
   }
 
   const deleteCurrentGame = async () => {
-    if (!confirm('Delete the current game? This will end the round and stop the game.')) {
-      return
-    }
-
     try {
       // Stop the game
       setIsGameRunning(false)
@@ -231,7 +233,7 @@ export default function AdminPanel() {
         setCountdown(0)
       }
 
-      // Broadcast no active game and clear waiting state
+      // Broadcast no active game (don't change waiting state)
       if (broadcastChannel.current) {
         broadcastChannel.current.send({
           type: 'broadcast',
@@ -240,7 +242,6 @@ export default function AdminPanel() {
             adminSessionId: adminSessionId.current,
             currentRound: null,
             countdown: 0,
-            isWaiting: false,
             goldPrice: { price: currentPrice, change: 0, timestamp: new Date().toISOString() }
           }
         })
@@ -579,7 +580,7 @@ export default function AdminPanel() {
           onConflict: 'session_id'
         })
 
-      // Start heartbeat to update presence every 2 seconds
+      // Start heartbeat to update presence every 1 second
       presenceHeartbeatInterval.current = setInterval(async () => {
         try {
           await supabase
@@ -591,7 +592,7 @@ export default function AdminPanel() {
         } catch (error) {
           console.error('Failed to update admin presence:', error)
         }
-      }, 2000)
+      }, 1000)
 
       console.log('Admin presence initialized')
     } catch (error) {
@@ -662,10 +663,6 @@ export default function AdminPanel() {
   }
 
   const deleteUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-      return
-    }
-
     try {
       // Delete user (CASCADE will automatically delete related bets)
       const { error } = await supabase
@@ -684,10 +681,6 @@ export default function AdminPanel() {
   }
 
   const cleanPriceHistory = async () => {
-    if (!confirm('Are you sure you want to clean all price history? This action cannot be undone.')) {
-      return
-    }
-
     try {
       await supabase
         .from('gold_prices')
@@ -711,14 +704,6 @@ export default function AdminPanel() {
   }
 
   const resetAllData = async () => {
-    if (!confirm('DANGER: This will delete ALL data including users, bets, rounds, and price history. Are you absolutely sure?')) {
-      return
-    }
-
-    if (!confirm('Final confirmation: This action CANNOT be undone. Continue?')) {
-      return
-    }
-
     try {
       // Stop countdown and auto mode
       setIsAutoMode(false)
@@ -750,10 +735,6 @@ export default function AdminPanel() {
   }
 
   const cleanOldRounds = async () => {
-    if (!confirm('This will delete all completed rounds older than 24 hours. Continue?')) {
-      return
-    }
-
     try {
       const oneDayAgo = new Date()
       oneDayAgo.setHours(oneDayAgo.getHours() - 24)
@@ -883,6 +864,20 @@ export default function AdminPanel() {
 
     const newRoundNumber = (lastRound?.round_number || 0) + 1
 
+    // Get all online users (active in last 5 seconds)
+    const { data: presenceData } = await supabase
+      .from('presence')
+      .select('user_id')
+      .eq('session_type', 'user')
+      .gte('last_seen', new Date(Date.now() - 1000).toISOString())
+
+    // Extract unique user IDs
+    const allowedUsers = presenceData 
+      ? [...new Set(presenceData.map(p => p.user_id).filter(id => id))]
+      : []
+
+    console.log('Starting round with allowed users:', allowedUsers)
+
     const { data: newRound } = await supabase
       .from('rounds')
       .insert({
@@ -890,6 +885,7 @@ export default function AdminPanel() {
         start_price: startPrice,
         start_time: new Date().toISOString(),
         status: 'active',
+        allowed_users: allowedUsers,
       })
       .select()
       .single()
@@ -1191,7 +1187,7 @@ export default function AdminPanel() {
                   </Button>
                 )}
                 <Button
-                  onClick={deleteCurrentGame}
+                  onClick={() => setShowDeleteDialog(true)}
                   size="sm"
                   variant="outline"
                   className="text-destructive hover:bg-destructive/10"
@@ -1390,7 +1386,7 @@ export default function AdminPanel() {
                              {editingUser !== user.id && (
                                 <div className="flex justify-end gap-2">
                                   <Button variant="outline" size="sm" onClick={() => { setEditingUser(user.id); setEditBalance(user.balance); }}>Edit</Button>
-                                  <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => deleteUser(user.id)}>Delete</Button>
+                                  <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => { setUserToDelete(user.id); setShowDeleteUserDialog(true); }}>Delete</Button>
                                 </div>
                              )}
                           </TableCell>
@@ -1479,14 +1475,14 @@ export default function AdminPanel() {
                         <div className="font-semibold">Clear Price History</div>
                         <div className="text-sm text-muted-foreground">Removes all price records except the latest ones.</div>
                       </div>
-                       <Button variant="outline" onClick={cleanPriceHistory}>Clear</Button>
+                       <Button variant="outline" onClick={() => setShowCleanPricesDialog(true)}>Clear</Button>
                     </div>
                      <div className="flex items-center justify-between p-4 border rounded-lg">
                       <div>
                         <div className="font-semibold">Clear Old Rounds</div>
                         <div className="text-sm text-muted-foreground">Removes completed rounds older than 24 hours.</div>
                       </div>
-                       <Button variant="outline" onClick={cleanOldRounds}>Clear</Button>
+                       <Button variant="outline" onClick={() => setShowCleanRoundsDialog(true)}>Clear</Button>
                     </div>
                  </CardContent>
                </Card>
@@ -1503,7 +1499,7 @@ export default function AdminPanel() {
                            This action will wipe ALL data including users, bets, and settings. This cannot be undone.
                          </AlertDescription>
                        </Alert>
-                       <Button variant="destructive" onClick={resetAllData}>Reset Entire System</Button>
+                       <Button variant="destructive" onClick={() => setShowResetAllDialog(true)}>Reset Entire System</Button>
                     </div>
                  </CardContent>
                </Card>
@@ -1512,6 +1508,146 @@ export default function AdminPanel() {
 
         </main>
       </div>
+
+      {/* Delete Game Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Current Game?</DialogTitle>
+            <DialogDescription>
+              This will end the current round and stop the game. Players will return to the waiting screen.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => {
+                setShowDeleteDialog(false)
+                deleteCurrentGame()
+              }}
+            >
+              Delete Game
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete User Confirmation Dialog */}
+      <Dialog open={showDeleteUserDialog} onOpenChange={setShowDeleteUserDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete User?</DialogTitle>
+            <DialogDescription>
+              This will permanently delete this user and all their bets. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteUserDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => {
+                setShowDeleteUserDialog(false)
+                if (userToDelete) {
+                  deleteUser(userToDelete)
+                  setUserToDelete(null)
+                }
+              }}
+            >
+              Delete User
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Clean Price History Dialog */}
+      <Dialog open={showCleanPricesDialog} onOpenChange={setShowCleanPricesDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clean Price History?</DialogTitle>
+            <DialogDescription>
+              This will delete all price history and reset to starting price. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCleanPricesDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => {
+                setShowCleanPricesDialog(false)
+                cleanPriceHistory()
+              }}
+            >
+              Clean History
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Clean Old Rounds Dialog */}
+      <Dialog open={showCleanRoundsDialog} onOpenChange={setShowCleanRoundsDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clean Old Rounds?</DialogTitle>
+            <DialogDescription>
+              This will delete all completed rounds older than 24 hours. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCleanRoundsDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => {
+                setShowCleanRoundsDialog(false)
+                cleanOldRounds()
+              }}
+            >
+              Clean Rounds
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset All Data Dialog */}
+      <Dialog open={showResetAllDialog} onOpenChange={setShowResetAllDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>⚠️ DANGER: Reset Entire System?</DialogTitle>
+            <DialogDescription className="space-y-2">
+              <p className="font-bold text-destructive">This will delete ALL data including:</p>
+              <ul className="list-disc list-inside text-sm">
+                <li>All users</li>
+                <li>All bets</li>
+                <li>All rounds</li>
+                <li>All price history</li>
+              </ul>
+              <p className="font-bold">This action CANNOT be undone!</p>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowResetAllDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => {
+                setShowResetAllDialog(false)
+                resetAllData()
+              }}
+            >
+              Reset Everything
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
     </>
   )
