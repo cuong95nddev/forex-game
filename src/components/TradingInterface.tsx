@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { TrendingUp, TrendingDown, Clock, DollarSign, Users } from 'lucide-react'
+import { TrendingUp, TrendingDown, Clock, DollarSign, Users, Target } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import TradingChart from './TradingChart'
 import { toast } from 'sonner'
@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 export default function TradingInterface() {
   const { 
@@ -38,7 +39,14 @@ export default function TradingInterface() {
     isWaitingForNewGame,
     isGameCompleted,
     leaderboard,
-    maxRound
+    maxRound,
+    userSkills,
+    loadUserSkills,
+    loadSkillDefinitions,
+    activateSkill,
+    subscribeToSkillSignals,
+    incomingSkillEffect,
+    clearIncomingSkillEffect
   } = useStore()
   
   const [betAmount, setBetAmount] = useState('100')
@@ -50,6 +58,8 @@ export default function TradingInterface() {
   const lastPriceRef = useRef<number | null>(null)
   const [balanceFlash, setBalanceFlash] = useState(false)
   const lastBalanceRef = useRef<number | null>(null)
+  const [showTargetDialog, setShowTargetDialog] = useState(false)
+  const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null)
 
   // Flash animation when price changes
   useEffect(() => {
@@ -86,18 +96,22 @@ export default function TradingInterface() {
     loadPriceHistory()
     loadOnlineUsers()
     loadAllUsers()
+    loadUserSkills()
+    loadSkillDefinitions()
+    subscribeToSkillSignals()
     
     // Refresh online users every 5 seconds
     const interval = setInterval(() => {
       loadOnlineUsers()
       loadAllUsers()
       loadActiveBets()
+      loadUserSkills()
     }, 5000)
     
     return () => {
       clearInterval(interval)
     }
-  }, [loadRecentBets, loadActiveBets, loadPriceHistory, loadOnlineUsers, loadAllUsers])
+  }, [loadRecentBets, loadActiveBets, loadPriceHistory, loadOnlineUsers, loadAllUsers, loadUserSkills, loadSkillDefinitions, subscribeToSkillSignals])
 
   useEffect(() => {
     // Convert price history to chart format
@@ -682,13 +696,63 @@ export default function TradingInterface() {
             <div className="p-3 border-b border-[#1e293b] bg-[#1e293b]/20 flex items-center justify-between">
               <h2 className="text-xs font-bold text-white uppercase tracking-widest">⚡ Skills</h2>
               <Badge variant="outline" className="text-[10px] h-5 border-[#334155] text-[#94a3b8]">
-                Coming Soon
+                {userSkills.length}
               </Badge>
             </div>
             
             <ScrollArea className="flex-1">
-              <div className="p-4 text-center">
-                <p className="text-xs text-[#94a3b8]">Skill system will be available here</p>
+              <div className="p-2 space-y-2">
+                {userSkills.length === 0 ? (
+                  <div className="p-4 text-center">
+                    <p className="text-xs text-[#94a3b8]">No skills yet</p>
+                  </div>
+                ) : (
+                  userSkills.map((skill) => {
+                    const skillDef = skill.skill_definitions
+                    const isOnCooldown = skill.last_used_round !== null && currentRound && 
+                      (currentRound.round_number - skill.last_used_round < (skillDef?.cooldown_rounds || 0))
+                    const cooldownRemaining = isOnCooldown && skillDef && currentRound
+                      ? skillDef.cooldown_rounds - (currentRound.round_number - skill.last_used_round!)
+                      : 0
+
+                    return (
+                      <div
+                        key={skill.id}
+                        className={`p-3 rounded-lg border ${
+                          isOnCooldown
+                            ? 'bg-[#1e293b]/30 border-[#334155] opacity-50'
+                            : 'bg-[#1e293b]/50 border-[#334155] hover:border-[#f59e0b] cursor-pointer'
+                        } transition-all`}
+                        onClick={() => {
+                          if (!isOnCooldown && skillDef) {
+                            if (skillDef.id === 'steal_money') {
+                              setSelectedSkillId(skillDef.id)
+                              setShowTargetDialog(true)
+                            } else {
+                              activateSkill(skillDef.id)
+                            }
+                          }
+                        }}
+                      >
+                        <div className="flex items-start justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-2xl">{skillDef?.icon || '⚡'}</span>
+                            <div>
+                              <h3 className="text-xs font-bold text-white">{skillDef?.name || 'Unknown'}</h3>
+                              {isOnCooldown && (
+                                <p className="text-[9px] text-[#ef4444]">Cooldown: {cooldownRemaining} rounds</p>
+                              )}
+                            </div>
+                          </div>
+                          <Badge variant="outline" className="text-[9px] h-4 border-[#334155] text-[#94a3b8]">
+                            x{skill.quantity}
+                          </Badge>
+                        </div>
+                        <p className="text-[10px] text-[#94a3b8] mt-1">{skillDef?.description || ''}</p>
+                      </div>
+                    )
+                  })
+                )}
               </div>
             </ScrollArea>
           </div>
@@ -806,6 +870,89 @@ export default function TradingInterface() {
         </div>
         
       </div>
+
+      {/* Target Selection Dialog */}
+      <Dialog open={showTargetDialog} onOpenChange={setShowTargetDialog}>
+        <DialogContent className="bg-[#0f172a] border-[#334155] text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-[#f59e0b]">
+              <Target className="w-5 h-5" />
+              Select Target
+            </DialogTitle>
+            <DialogDescription className="text-[#94a3b8]">
+              Choose a trader to steal bananas from
+            </DialogDescription>
+          </DialogHeader>
+          
+          <ScrollArea className="max-h-[400px] mt-4">
+            <div className="space-y-2">
+              {allUsers
+                .filter(u => u.id !== user?.id) // Can't target yourself
+                .map((targetUser) => (
+                  <div
+                    key={targetUser.id}
+                    className="p-3 rounded-lg border border-[#334155] bg-[#1e293b]/50 hover:border-[#f59e0b] cursor-pointer transition-all"
+                    onClick={async () => {
+                      if (selectedSkillId) {
+                        const success = await activateSkill(selectedSkillId, targetUser.id)
+                        if (success) {
+                          setShowTargetDialog(false)
+                          setSelectedSkillId(null)
+                        }
+                      }
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-8 w-8 border border-[#334155]">
+                          <AvatarFallback className="text-xs bg-[#1e293b] text-[#94a3b8]">
+                            {targetUser.name?.substring(0, 1).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="text-sm font-medium text-white">{targetUser.name}</p>
+                          <p className="text-xs text-[#94a3b8] font-mono">🍌 {targetUser.balance.toLocaleString()}</p>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-xs border-[#334155] text-[#94a3b8]">
+                        Select
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Skill Effect Overlay */}
+      {incomingSkillEffect && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+          <div 
+            className="bg-[#0f172a] border-2 border-[#ef4444] rounded-xl p-8 shadow-2xl animate-pulse pointer-events-auto"
+            style={{
+              animation: 'skillEffect 0.5s ease-in-out'
+            }}
+          >
+            <div className="text-center">
+              <div className="text-6xl mb-4">💰</div>
+              <h2 className="text-2xl font-bold text-[#ef4444] mb-2">You've Been Robbed!</h2>
+              <p className="text-lg text-white mb-1">
+                Someone stole <span className="text-[#f59e0b] font-bold">🍌{incomingSkillEffect.amount}</span> from you!
+              </p>
+              <p className="text-sm text-[#94a3b8]">
+                Your bananas have been taken by a skilled trader
+              </p>
+              <Button
+                onClick={clearIncomingSkillEffect}
+                className="mt-4 bg-[#ef4444] hover:bg-[#dc2626] text-white"
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

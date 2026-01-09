@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { supabase, type User, type GoldPrice } from '../lib/supabase'
+import { supabase, type User, type GoldPrice, type UserSkill, type SkillDefinition, type SkillSignal } from '../lib/supabase'
 import { getFingerprint } from '../lib/fingerprint'
 import { toast } from 'sonner'
 import confetti from 'canvas-confetti'
@@ -46,6 +46,9 @@ interface AppState {
   isGameCompleted: boolean
   leaderboard: User[]
   maxRound: number | null
+  userSkills: UserSkill[]
+  skillDefinitions: SkillDefinition[]
+  incomingSkillEffect: SkillSignal | null
   setLastWinAmount: (amount: number | null) => void
   lastLossAmount: number | null
   setLastLossAmount: (amount: number | null) => void
@@ -57,12 +60,17 @@ interface AppState {
   subscribeToRounds: () => void
   subscribeToUsers: () => void
   subscribeToAdminPresence: () => void
+  subscribeToSkillSignals: () => void
   updateUserPresence: () => Promise<void>
   loadRecentBets: () => Promise<void>
   loadActiveBets: () => Promise<void>
   loadPriceHistory: () => Promise<void>
   loadOnlineUsers: () => Promise<void>
   loadAllUsers: () => Promise<void>
+  loadUserSkills: () => Promise<void>
+  loadSkillDefinitions: () => Promise<void>
+  activateSkill: (skillId: string, targetUserId?: string) => Promise<boolean>
+  clearIncomingSkillEffect: () => void
 }
 
 let broadcastChannel: any = null
@@ -71,6 +79,7 @@ let roundsChannel: any = null
 let betsChannel: any = null
 let usersChannel: any = null
 let presenceChannel: any = null
+let skillSignalsChannel: any = null
 let subscriptionsActive = false
 let acceptedAdminSession: string | null = null // Only accept broadcasts from one admin
 let userSessionId: string | null = null
@@ -97,9 +106,13 @@ export const useStore = create<AppState>((set, get) => ({
   isGameCompleted: false,
   leaderboard: [],
   maxRound: null,
+  userSkills: [],
+  skillDefinitions: [],
+  incomingSkillEffect: null,
 
   setLastWinAmount: (amount) => set({ lastWinAmount: amount }),
   setLastLossAmount: (amount) => set({ lastLossAmount: amount }),
+  clearIncomingSkillEffect: () => set({ incomingSkillEffect: null }),
 
   loadUser: async () => {
     try {
@@ -985,6 +998,123 @@ export const useStore = create<AppState>((set, get) => ({
     } catch (error) {
       console.error('Failed to initialize user presence:', error)
     }
+  },
+
+  loadUserSkills: async () => {
+    try {
+      const { user } = get()
+      if (!user) return
+
+      const { data, error } = await supabase
+        .from('user_skills')
+        .select(`
+          *,
+          skill_definitions (*)
+        `)
+        .eq('user_id', user.id)
+
+      if (error) throw error
+      set({ userSkills: data || [] })
+    } catch (error) {
+      console.error('Failed to load user skills:', error)
+    }
+  },
+
+  loadSkillDefinitions: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('skill_definitions')
+        .select('*')
+
+      if (error) throw error
+      set({ skillDefinitions: data || [] })
+    } catch (error) {
+      console.error('Failed to load skill definitions:', error)
+    }
+  },
+
+  activateSkill: async (skillId: string, targetUserId?: string) => {
+    try {
+      const { user, currentRound, userSkills } = get()
+      if (!user || !currentRound) return false
+
+      // Check if user has this skill
+      const userSkill = userSkills.find(s => s.skill_id === skillId)
+      if (!userSkill || userSkill.quantity <= 0) {
+        toast.error('You don\'t have this skill!')
+        return false
+      }
+
+      // Check cooldown
+      if (userSkill.last_used_round !== null) {
+        const skillDef = userSkill.skill_definitions
+        if (skillDef && currentRound.round_number - userSkill.last_used_round < skillDef.cooldown_rounds) {
+          toast.error(`Skill is on cooldown! Wait ${skillDef.cooldown_rounds - (currentRound.round_number - userSkill.last_used_round)} more rounds.`)
+          return false
+        }
+      }
+
+      // Create skill signal for admin to process
+      const { error } = await supabase
+        .from('skill_signals')
+        .insert({
+          signal_type: 'skill_request',
+          from_user_id: user.id,
+          target_user_id: targetUserId || null,
+          skill_id: skillId,
+          round_number: currentRound.round_number,
+          processed: false
+        })
+
+      if (error) throw error
+
+      toast.success('⚡ Skill activated! Processing...')
+      return true
+    } catch (error) {
+      console.error('Failed to activate skill:', error)
+      toast.error('Failed to activate skill!')
+      return false
+    }
+  },
+
+  subscribeToSkillSignals: () => {
+    const { user } = get()
+    if (!user) return
+
+    // Clean up existing channel if it exists
+    if (skillSignalsChannel) {
+      skillSignalsChannel.unsubscribe()
+      skillSignalsChannel = null
+    }
+
+    skillSignalsChannel = supabase
+      .channel('skill-signals')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'skill_signals',
+          filter: `target_user_id=eq.${user.id}`
+        },
+        async (payload) => {
+          const signal = payload.new as SkillSignal
+          
+          if (signal.signal_type === 'skill_executed') {
+            // Show effect to target user
+            set({ incomingSkillEffect: signal })
+            
+            // Reload user balance
+            await get().loadUser()
+            
+            // Auto-clear after 5 seconds
+            setTimeout(() => {
+              get().clearIncomingSkillEffect()
+            }, 5000)
+          }
+        }
+      )
+      .subscribe()
   },
 
 

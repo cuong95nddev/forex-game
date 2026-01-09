@@ -42,3 +42,43 @@ export interface Position {
   gold_quantity: number
   average_price: number
 }
+
+export interface SkillDefinition {
+  id: string
+  name: string
+  description: string
+  icon: string
+  cooldown_rounds: number
+}
+
+export interface UserSkill {
+  id: string
+  user_id: string
+  skill_id: string
+  quantity: number
+  last_used_round: number | null
+  created_at: string
+  skill_definitions?: SkillDefinition
+}
+
+export interface SkillSignal {
+  id: string
+  signal_type: 'skill_request' | 'skill_executed'
+  from_user_id: string
+  target_user_id: string | null
+  skill_id: string
+  amount: number
+  round_number: number | null
+  processed: boolean
+  created_at: string
+}
+
+export interface SkillUsageLog {
+  id: string
+  user_id: string
+  target_user_id: string | null
+  skill_id: string
+  round_number: number
+  amount: number
+  created_at: string
+}

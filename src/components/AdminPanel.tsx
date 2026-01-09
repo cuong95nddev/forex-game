@@ -626,6 +626,126 @@ export default function AdminPanel() {
       .subscribe((status) => {
         console.log('Users subscription status:', status)
       })
+
+    // Subscribe to skill signals
+    supabase
+      .channel('admin-skill-signals')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'skill_signals',
+        },
+        async (payload) => {
+          const signal = payload.new
+          console.log('Skill signal received:', signal)
+          
+          if (signal.signal_type === 'skill_request' && !signal.processed) {
+            await processSkillRequest(signal)
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('Skill signals subscription status:', status)
+      })
+  }
+
+  const processSkillRequest = async (signal: any) => {
+    try {
+      console.log('Processing skill request:', signal)
+      
+      const { skill_id, from_user_id, target_user_id, round_number } = signal
+
+      if (skill_id === 'steal_money') {
+        // Get both users
+        const { data: fromUser } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', from_user_id)
+          .single()
+
+        const { data: targetUser } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', target_user_id)
+          .single()
+
+        if (!fromUser || !targetUser) {
+          console.error('User not found')
+          return
+        }
+
+        // Calculate steal amount (10% of target's balance, min 100, max 1000)
+        const stealAmount = Math.min(
+          Math.max(Math.floor(targetUser.balance * 0.1), 100),
+          1000
+        )
+
+        // Update balances
+        await supabase
+          .from('users')
+          .update({ balance: fromUser.balance + stealAmount })
+          .eq('id', from_user_id)
+
+        await supabase
+          .from('users')
+          .update({ balance: Math.max(0, targetUser.balance - stealAmount) })
+          .eq('id', target_user_id)
+
+        // Update user skill (decrease quantity and set last_used_round)
+        const { data: userSkill } = await supabase
+          .from('user_skills')
+          .select('*')
+          .eq('user_id', from_user_id)
+          .eq('skill_id', skill_id)
+          .single()
+
+        if (userSkill) {
+          await supabase
+            .from('user_skills')
+            .update({
+              quantity: Math.max(0, userSkill.quantity - 1),
+              last_used_round: round_number
+            })
+            .eq('id', userSkill.id)
+        }
+
+        // Log skill usage
+        await supabase
+          .from('skill_usage_log')
+          .insert({
+            user_id: from_user_id,
+            target_user_id: target_user_id,
+            skill_id: skill_id,
+            round_number: round_number,
+            amount: stealAmount
+          })
+
+        // Send executed signal to target user
+        await supabase
+          .from('skill_signals')
+          .insert({
+            signal_type: 'skill_executed',
+            from_user_id: from_user_id,
+            target_user_id: target_user_id,
+            skill_id: skill_id,
+            amount: stealAmount,
+            round_number: round_number,
+            processed: true
+          })
+
+        // Mark original signal as processed
+        await supabase
+          .from('skill_signals')
+          .update({ processed: true })
+          .eq('id', signal.id)
+
+        console.log(`Skill executed: ${fromUser.name} stole 🍌${stealAmount} from ${targetUser.name}`)
+      }
+    } catch (error) {
+      console.error('Failed to process skill request:', error)
+    }
   }
 
   const loadStats = async () => {
