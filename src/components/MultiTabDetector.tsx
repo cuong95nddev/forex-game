@@ -21,7 +21,7 @@ export function MultiTabDetector() {
   const blockingOverlayRef = useRef<HTMLDivElement>(null)
   
   // Don't run the detector on admin pages
-  if (location.pathname.startsWith('/admin')) {
+  if (location.pathname.startsWith('/YWR2ZXJ0aXNpbmcgYW5kIGNvbnRlbnQgbWVhc3VyZW1lbnQsIGF1ZGllbmNlIHJlc2VhcmNoIGFuZCBzZXJ2aWNlcyBkZXZlbG9wbWVudC4gV2l0aCB5b3VyIHBlcm1pc3Npb24gd2UgYW5kIG91ciBwYXJ0bmVycyBtYXkgdXNlIHByZWNpc2UgZ2VvbG9jYXRpb24gZGF0YSBhbmQgaWRlbnRpZmljYXRpb24gdGhyb3VnaCBkZXZpY2Ugc2Nhbm5pbmcuIFlvdSBtYXkgY2xpY2sgdG8gY29uc2VudCB0byBvdXIgYW5kIG91ciAxNTU4IHBhcnRuZXJz4oCZIHByb2Nlc3NpbmcgYXMgZGVzY3JpYmVkIGFib3ZlLiBBbHRlcm5hdGl2ZWx5IHlvdSBtYXkgY2xpY2sgdG8gcmVmdXNlIHRvIGNvbnNlbnQgb3IgYWNjZXNzIG1vcmUgZGV0YWlsZWQgaW5mb3JtYXRpb24gYW5kIGM=')) {
     return null
   }
   
