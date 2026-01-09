@@ -436,8 +436,30 @@ export default function AdminPanel() {
       setLeaderboard([])
       setGameStatus('running')
       
-      // Initialize with fresh price
-      await supabase.from('gold_prices').insert({ price: 2000, change: 0 })
+      // Initialize with historical price data to populate the chart
+      const historicalPrices = []
+      const now = new Date()
+      const basePrice = 2000
+      let currentHistoricalPrice = basePrice
+      
+      // Generate 50 historical data points (going back in time)
+      for (let i = 50; i >= 0; i--) {
+        // Add some random variation (-10 to +10)
+        const variation = (Math.random() - 0.5) * 20
+        currentHistoricalPrice = Math.max(1900, Math.min(2100, currentHistoricalPrice + variation))
+        
+        // Create timestamp going back 1 second per data point
+        const timestamp = new Date(now.getTime() - (i * 1000))
+        
+        historicalPrices.push({
+          price: Math.round(currentHistoricalPrice * 100) / 100,
+          change: variation,
+          timestamp: timestamp.toISOString()
+        })
+      }
+      
+      // Insert all historical prices
+      await supabase.from('gold_prices').insert(historicalPrices)
       
       // Start first round
       await startNewRound(2000)
