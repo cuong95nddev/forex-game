@@ -1,4 +1,4 @@
-import { createChart, ColorType, CandlestickSeries } from 'lightweight-charts';
+import { createChart, ColorType, BaselineSeries } from 'lightweight-charts';
 import type { Time } from 'lightweight-charts';
 import { useEffect, useRef } from 'react';
 
@@ -9,59 +9,35 @@ interface TradingChartProps {
   }>;
 }
 
-interface Candle {
+interface LineData {
   time: Time;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
+  value: number;
 }
 
 export default function TradingChart({ prices }: TradingChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<ReturnType<typeof createChart> | null>(null);
   const seriesRef = useRef<any>(null);
+  const baselineValueRef = useRef<number | null>(null);
 
-  // Convert prices to candlesticks (group by time intervals)
-  // We'll use this helper to process the incoming raw price stream
-  const createCandles = (priceData: typeof prices): Candle[] => {
+  // Convert prices to line data format
+  const createLineData = (priceData: typeof prices): LineData[] => {
     if (priceData.length === 0) return [];
     
-    const candles: Candle[] = [];
-    const intervalSeconds = 2; // 2-second candles
-    
-    let currentCandle: Candle | null = null;
-    
-    // Sort by time just in case
+    // Sort by time and convert to line data format
     const sortedData = [...priceData].sort((a, b) => a.time - b.time);
-
+    
+    // Deduplicate by time - keep the last value for each timestamp
+    // lightweight-charts requires strictly ascending unique timestamps
+    const uniqueData = new Map<number, number>();
     sortedData.forEach((price) => {
-      // time is in seconds
-      const candleTime = (Math.floor(price.time / intervalSeconds) * intervalSeconds) as Time;
-      
-      if (!currentCandle || currentCandle.time !== candleTime) {
-        if (currentCandle) {
-          candles.push(currentCandle);
-        }
-        currentCandle = {
-          time: candleTime,
-          open: price.value,
-          high: price.value,
-          low: price.value,
-          close: price.value
-        };
-      } else {
-        currentCandle.high = Math.max(currentCandle.high, price.value);
-        currentCandle.low = Math.min(currentCandle.low, price.value);
-        currentCandle.close = price.value;
-      }
+      uniqueData.set(price.time, price.value);
     });
     
-    if (currentCandle) {
-      candles.push(currentCandle);
-    }
-    
-    return candles;
+    return Array.from(uniqueData.entries()).map(([time, value]) => ({
+      time: time as Time,
+      value
+    }));
   };
 
   useEffect(() => {
@@ -88,16 +64,23 @@ export default function TradingChart({ prices }: TradingChartProps) {
       },
     });
 
-    const candlestickSeries = chart.addSeries(CandlestickSeries, {
-      upColor: '#10b981', // --green
-      downColor: '#ef4444', // --red
-      borderVisible: false,
-      wickUpColor: '#10b981',
-      wickDownColor: '#ef4444',
+    const baselineSeries = chart.addSeries(BaselineSeries, {
+      baseValue: { type: 'price', price: 0 }, // Will be updated with first price
+      topLineColor: '#10b981', // Green for up
+      topFillColor1: 'rgba(16, 185, 129, 0.28)',
+      topFillColor2: 'rgba(16, 185, 129, 0.05)',
+      bottomLineColor: '#ef4444', // Red for down
+      bottomFillColor1: 'rgba(239, 68, 68, 0.05)',
+      bottomFillColor2: 'rgba(239, 68, 68, 0.28)',
+      lineWidth: 2,
+      crosshairMarkerVisible: true,
+      crosshairMarkerRadius: 4,
+      lastValueVisible: true,
+      priceLineVisible: true,
     });
 
     chartRef.current = chart;
-    seriesRef.current = candlestickSeries;
+    seriesRef.current = baselineSeries;
 
     const handleResize = () => {
       if (chartContainerRef.current) {
@@ -118,13 +101,16 @@ export default function TradingChart({ prices }: TradingChartProps) {
 
   useEffect(() => {
     if (seriesRef.current && prices.length > 0) {
-      const candles = createCandles(prices);
-      if (candles.length > 0) {
-        seriesRef.current.setData(candles);
-        
-        // Ensure the last candle is visible
-        // You might want to adjust fitContent behavior
-        // chartRef.current?.timeScale().fitContent(); 
+      const lineData = createLineData(prices);
+      if (lineData.length > 0) {
+        // Set baseline to the first price value (starting point)
+        if (baselineValueRef.current === null) {
+          baselineValueRef.current = lineData[0].value;
+          seriesRef.current.applyOptions({
+            baseValue: { type: 'price', price: baselineValueRef.current },
+          });
+        }
+        seriesRef.current.setData(lineData);
       }
     }
   }, [prices]);
