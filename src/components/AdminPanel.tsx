@@ -971,6 +971,116 @@ export default function AdminPanel() {
           .eq('id', signal.id)
 
         console.log(`Skill executed: ${fromUser.name} froze ${targetUser.name} until round ${freezeUntilRound}`)
+      } else if (skill_id === 'double_win') {
+        // Get user
+        const { data: fromUser } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', from_user_id)
+          .single()
+
+        if (!fromUser) {
+          console.error('User not found')
+          return
+        }
+
+        // Store active double win for current round
+        
+        // Check if user already has active double win for this round
+        const { data: existingDoubleWin } = await supabase
+          .from('active_double_win')
+          .select('*')
+          .eq('user_id', from_user_id)
+          .eq('next_round', round_number)
+          .eq('used', false)
+          .maybeSingle()
+
+        if (existingDoubleWin) {
+          console.log('User already has active double win for this round')
+          // Mark signal as processed and return early
+          await supabase
+            .from('skill_signals')
+            .update({ processed: true })
+            .eq('id', signal.id)
+          return
+        }
+        
+        // Delete any old double win records for this user
+        await supabase
+          .from('active_double_win')
+          .delete()
+          .eq('user_id', from_user_id)
+
+        // Insert new double win activation for current round
+        await supabase
+          .from('active_double_win')
+          .insert({
+            user_id: from_user_id,
+            activated_round: round_number,
+            next_round: round_number,
+            used: false
+          })
+
+        // Update user skill (decrease quantity)
+        const { data: userSkill, error: skillError } = await supabase
+          .from('user_skills')
+          .select('*')
+          .eq('user_id', from_user_id)
+          .eq('skill_id', skill_id)
+          .single()
+
+        if (skillError) {
+          console.error('Error fetching user skill:', skillError)
+        }
+
+        if (userSkill) {
+          console.log('Current skill quantity:', userSkill.quantity)
+          // Decrease quantity (consumable skill)
+          const { error: updateError } = await supabase
+            .from('user_skills')
+            .update({
+              quantity: Math.max(0, userSkill.quantity - 1)
+            })
+            .eq('id', userSkill.id)
+          
+          if (updateError) {
+            console.error('Error updating skill quantity:', updateError)
+          } else {
+            console.log('Skill quantity updated to:', Math.max(0, userSkill.quantity - 1))
+          }
+        }
+
+        // Log skill usage
+        await supabase
+          .from('skill_usage_log')
+          .insert({
+            user_id: from_user_id,
+            target_user_id: null,
+            skill_id: skill_id,
+            round_number: round_number,
+            amount: 0
+          })
+
+        // Send success signal to user
+        await supabase
+          .from('skill_signals')
+          .insert({
+            signal_type: 'skill_success',
+            from_user_id: from_user_id,
+            target_user_id: from_user_id, // Send to self
+            skill_id: skill_id,
+            amount: 0,
+            round_number: round_number, // Current round
+            processed: true
+          })
+
+        // Mark original signal as processed
+        await supabase
+          .from('skill_signals')
+          .update({ processed: true })
+          .eq('id', signal.id)
+
+        console.log(`Skill executed: ${fromUser.name} activated double win for round ${round_number}`)
       }
     } catch (error) {
       console.error('Failed to process skill request:', error)
@@ -1205,7 +1315,44 @@ export default function AdminPanel() {
             (bet.prediction === 'down' && !priceWentUp)
 
           const result = userWon ? 'won' : 'lost'
-          const profit = userWon ? bet.bet_amount * winRate : 0
+          let profit = userWon ? bet.bet_amount * winRate : 0
+
+          // Check if user has active double win for this round
+          if (userWon) {
+            const { data: doubleWin } = await supabase
+              .from('active_double_win')
+              .select('*')
+              .eq('user_id', bet.user_id)
+              .eq('next_round', round.round_number)
+              .eq('used', false)
+              .maybeSingle()
+
+            if (doubleWin) {
+              // Double the profit!
+              profit = profit * 2
+              
+              // Mark double win as used
+              await supabase
+                .from('active_double_win')
+                .update({ used: true })
+                .eq('id', doubleWin.id)
+
+              console.log(`🎲 Double win applied for user ${bet.user_id}: profit ${profit / 2} → ${profit}`)
+              
+              // Send double win effect signal to user
+              await supabase
+                .from('skill_signals')
+                .insert({
+                  signal_type: 'skill_effect',
+                  from_user_id: bet.user_id,
+                  target_user_id: bet.user_id,
+                  skill_id: 'double_win',
+                  amount: profit,
+                  round_number: round.round_number,
+                  processed: true
+                })
+            }
+          }
 
           // Update bet result
           await supabase
@@ -1386,6 +1533,13 @@ export default function AdminPanel() {
       .from('frozen_users')
       .delete()
       .lt('frozen_until_round', newRoundNumber)
+
+    // Clear expired double win buffs from previous rounds
+    // Double win for round N should be cleared when moving to round N+1
+    await supabase
+      .from('active_double_win')
+      .delete()
+      .lt('next_round', newRoundNumber)
 
     // Get all online users (active in last 5 seconds)
     const { data: presenceData } = await supabase

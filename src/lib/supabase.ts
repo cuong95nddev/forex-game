@@ -63,7 +63,7 @@ export interface UserSkill {
 
 export interface SkillSignal {
   id: string
-  signal_type: 'skill_request' | 'skill_executed' | 'skill_success'
+  signal_type: 'skill_request' | 'skill_executed' | 'skill_success' | 'skill_effect'
   from_user_id: string
   target_user_id: string | null
   skill_id: string

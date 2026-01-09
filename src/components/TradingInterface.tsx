@@ -52,7 +52,9 @@ export default function TradingInterface() {
     isFrozen,
     frozenUntilRound,
     checkFrozenStatus,
-    subscribeToFrozenStatus
+    subscribeToFrozenStatus,
+    hasActiveDoubleWin,
+    checkDoubleWinStatus
   } = useStore()
   
   const [betAmount, setBetAmount] = useState('100')
@@ -107,6 +109,7 @@ export default function TradingInterface() {
     subscribeToSkillSignals()
     subscribeToFrozenStatus()
     checkFrozenStatus()
+    checkDoubleWinStatus()
     
     // Refresh online users every 5 seconds
     const interval = setInterval(() => {
@@ -115,12 +118,13 @@ export default function TradingInterface() {
       loadActiveBets()
       loadUserSkills()
       checkFrozenStatus()
+      checkDoubleWinStatus()
     }, 5000)
     
     return () => {
       clearInterval(interval)
     }
-  }, [loadRecentBets, loadActiveBets, loadPriceHistory, loadOnlineUsers, loadAllUsers, loadUserSkills, loadSkillDefinitions, subscribeToSkillSignals, subscribeToFrozenStatus, checkFrozenStatus])
+  }, [loadRecentBets, loadActiveBets, loadPriceHistory, loadOnlineUsers, loadAllUsers, loadUserSkills, loadSkillDefinitions, subscribeToSkillSignals, subscribeToFrozenStatus, checkFrozenStatus, checkDoubleWinStatus])
 
   useEffect(() => {
     // Convert price history to chart format
@@ -486,7 +490,30 @@ export default function TradingInterface() {
       {incomingSkillEffect && (
          <div className="absolute inset-0 z-[100] flex items-center justify-center pointer-events-none">
             <div className="flex flex-col items-center overlay-animate">
-               {incomingSkillEffect.skill_id === 'freezer' ? (
+               {incomingSkillEffect.skill_id === 'double_win' && incomingSkillEffect.signal_type === 'skill_success' ? (
+                 // Double win activated
+                 <>
+                   <div className="text-6xl font-black text-[#a855f7] drop-shadow-[0_0_15px_rgba(168,85,247,0.5)] mb-2 overlay-glow">
+                     🎲
+                   </div>
+                   <div className="text-2xl font-bold text-white uppercase tracking-widest bg-[#a855f7]/20 px-6 py-2 rounded-full border border-[#a855f7]/50 backdrop-blur-md overlay-pulse">
+                     🎲 DOUBLE WIN ACTIVE! 🎲
+                   </div>
+                   <div className="text-sm text-[#a855f7] mt-2">
+                     This round's winnings will be DOUBLED!
+                   </div>
+                 </>
+               ) : incomingSkillEffect.skill_id === 'double_win' && incomingSkillEffect.signal_type === 'skill_effect' ? (
+                 // Double win triggered
+                 <>
+                   <div className="text-6xl font-black text-[#a855f7] drop-shadow-[0_0_15px_rgba(168,85,247,0.5)] mb-2 overlay-glow">
+                     +🍌{incomingSkillEffect.amount?.toLocaleString()}
+                   </div>
+                   <div className="text-2xl font-bold text-white uppercase tracking-widest bg-[#a855f7]/20 px-6 py-2 rounded-full border border-[#a855f7]/50 backdrop-blur-md overlay-pulse">
+                     🎲 DOUBLE WIN! 🎲
+                   </div>
+                 </>
+               ) : incomingSkillEffect.skill_id === 'freezer' ? (
                  // Freezer skill
                  <>
                    {incomingSkillEffect.signal_type === 'skill_success' ? (
@@ -815,17 +842,21 @@ export default function TradingInterface() {
                   userSkills.map((skill) => {
                     const skillDef = skill.skill_definitions
                     const hasQuantity = skill.quantity > 0
+                    const isDoubleWinActive = skillDef?.id === 'double_win' && hasActiveDoubleWin
+                    const isDisabled = !hasQuantity || isDoubleWinActive
 
                     return (
                       <div
                         key={skill.id}
                         className={`p-3 rounded-lg border ${
-                          !hasQuantity
+                          isDisabled
                             ? 'bg-[#1e293b]/30 border-[#334155] opacity-50'
+                            : isDoubleWinActive
+                            ? 'bg-[#a855f7]/10 border-[#a855f7] animate-pulse'
                             : 'bg-[#1e293b]/50 border-[#334155] hover:border-[#f59e0b] cursor-pointer'
-                        } transition-all`}
+                        } transition-all relative`}
                         onClick={() => {
-                          if (hasQuantity && skillDef) {
+                          if (!isDisabled && skillDef) {
                             if (skillDef.id === 'steal_money' || skillDef.id === 'freezer') {
                               setSelectedSkillId(skillDef.id)
                               setShowTargetDialog(true)
@@ -842,6 +873,9 @@ export default function TradingInterface() {
                               <h3 className="text-xs font-bold text-white">{skillDef?.name || 'Unknown'}</h3>
                               {!hasQuantity && (
                                 <p className="text-[9px] text-[#ef4444]">No uses left</p>
+                              )}
+                              {isDoubleWinActive && (
+                                <p className="text-[9px] text-[#a855f7] font-bold animate-pulse">🎲 ACTIVE THIS ROUND</p>
                               )}
                             </div>
                           </div>
@@ -863,7 +897,14 @@ export default function TradingInterface() {
         <div className="w-[320px] bg-[#0f172a] border-l border-[#1e293b] flex flex-col z-20 shadow-xl">
            
            <div className="p-4 border-b border-[#1e293b] bg-[#1e293b]/20">
-              <h2 className="text-sm font-bold text-white uppercase tracking-widest mb-1">🍌 Trade Bananas</h2>
+              <div className="flex items-center justify-between mb-1">
+                <h2 className="text-sm font-bold text-white uppercase tracking-widest">🍌 Trade Bananas</h2>
+                {hasActiveDoubleWin && (
+                  <Badge className="bg-gradient-to-r from-[#a855f7] to-[#9333ea] text-white text-[10px] font-bold uppercase px-2 py-0.5 animate-pulse border border-[#a855f7]/50">
+                    🎲 2x WIN
+                  </Badge>
+                )}
+              </div>
               <div className="text-[10px] text-[#94a3b8] flex justify-between">
                 <span>Banana Wallet</span>
                 <span className="text-[#f59e0b] font-mono">🍌 {user.balance.toLocaleString()}</span>
@@ -908,7 +949,10 @@ export default function TradingInterface() {
                  </div>
                  <div className="flex justify-between text-xs">
                     <span className="text-[#94a3b8]">Banana Profit</span>
-                    <span className="text-[#10b981] font-bold">+🍌 {(parseFloat(betAmount || '0') * winRate).toLocaleString()}</span>
+                    <span className={`font-bold ${hasActiveDoubleWin ? 'text-[#a855f7]' : 'text-[#10b981]'}`}>
+                      +🍌 {(parseFloat(betAmount || '0') * winRate * (hasActiveDoubleWin ? 2 : 1)).toLocaleString()}
+                      {hasActiveDoubleWin && <span className="text-[10px] ml-1">(2x)</span>}
+                    </span>
                  </div>
               </div>
 

@@ -52,6 +52,7 @@ interface AppState {
   incomingSkillEffect: SkillSignal | null
   isFrozen: boolean
   frozenUntilRound: number | null
+  hasActiveDoubleWin: boolean
   setLastWinAmount: (amount: number | null) => void
   lastLossAmount: number | null
   setLastLossAmount: (amount: number | null) => void
@@ -77,6 +78,7 @@ interface AppState {
   activateSkill: (skillId: string, targetUserId?: string) => Promise<boolean>
   clearIncomingSkillEffect: () => void
   checkFrozenStatus: () => Promise<void>
+  checkDoubleWinStatus: () => Promise<void>
 }
 
 let broadcastChannel: any = null
@@ -118,6 +120,7 @@ export const useStore = create<AppState>((set, get) => ({
   incomingSkillEffect: null,
   isFrozen: false,
   frozenUntilRound: null,
+  hasActiveDoubleWin: false,
 
   setLastWinAmount: (amount) => set({ lastWinAmount: amount }),
   setLastLossAmount: (amount) => set({ lastLossAmount: amount }),
@@ -1175,6 +1178,30 @@ export const useStore = create<AppState>((set, get) => ({
               get().clearIncomingSkillEffect()
             }, 5000)
           }
+          
+          if (signal.signal_type === 'skill_effect') {
+            // Show effect (e.g., double win triggered)
+            set({ incomingSkillEffect: signal })
+            
+            // Update user balance
+            const currentUser = get().user
+            if (currentUser) {
+              const { data: updatedUser } = await supabase
+                .from('users')
+                .select('balance')
+                .eq('id', currentUser.id)
+                .single()
+              
+              if (updatedUser) {
+                set({ user: { ...currentUser, balance: updatedUser.balance } })
+              }
+            }
+            
+            // Auto-clear after 5 seconds
+            setTimeout(() => {
+              get().clearIncomingSkillEffect()
+            }, 5000)
+          }
         }
       )
       .subscribe()
@@ -1198,6 +1225,25 @@ export const useStore = create<AppState>((set, get) => ({
       }
     } catch (error) {
       console.error('Failed to check frozen status:', error)
+    }
+  },
+
+  checkDoubleWinStatus: async () => {
+    const { user, currentRound } = get()
+    if (!user || !currentRound) return
+
+    try {
+      const { data: doubleWinRecord } = await supabase
+        .from('active_double_win')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('next_round', currentRound.round_number)
+        .eq('used', false)
+        .maybeSingle()
+
+      set({ hasActiveDoubleWin: !!doubleWinRecord })
+    } catch (error) {
+      console.error('Failed to check double win status:', error)
     }
   },
 
