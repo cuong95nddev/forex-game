@@ -36,6 +36,8 @@ export default function TradingInterface() {
     setLastWinAmount,
     lastLossAmount,
     setLastLossAmount,
+    lastPenaltyAmount,
+    setLastPenaltyAmount,
     isWaitingForNewGame,
     isGameCompleted,
     leaderboard,
@@ -166,6 +168,26 @@ export default function TradingInterface() {
        return () => clearTimeout(timer)
     }
   }, [lastLossAmount, setLastLossAmount])
+
+  useEffect(() => {
+    if (lastPenaltyAmount !== null) {
+       // Clear the penalty amount after 4 seconds to hide the animation
+       const timer = setTimeout(() => {
+          setLastPenaltyAmount(null)
+       }, 4000)
+       return () => clearTimeout(timer)
+    }
+  }, [lastPenaltyAmount, setLastPenaltyAmount])
+
+  useEffect(() => {
+    if (incomingSkillEffect !== null) {
+       // Clear the skill effect after 4 seconds to hide the animation
+       const timer = setTimeout(() => {
+          clearIncomingSkillEffect()
+       }, 4000)
+       return () => clearTimeout(timer)
+    }
+  }, [incomingSkillEffect, clearIncomingSkillEffect])
 
   const handleBet = async (prediction: 'up' | 'down') => {
     const amount = parseFloat(betAmount)
@@ -429,7 +451,48 @@ export default function TradingInterface() {
          </div>
       )}
 
+      {/* PENALTY ANIMATION OVERLAY */}
+      {lastPenaltyAmount !== null && (
+         <div className="absolute inset-0 z-[100] flex items-center justify-center pointer-events-none">
+            <div className="flex flex-col items-center animate-in fade-in zoom-in slide-in-from-bottom-10 duration-500">
+               <div className="text-6xl font-black text-[#f97316] drop-shadow-[0_0_15px_rgba(249,115,22,0.5)] mb-2">
+                  🔥-🍌{lastPenaltyAmount.toLocaleString()}
+               </div>
+               <div className="text-2xl font-bold text-white uppercase tracking-widest bg-[#f97316]/20 px-6 py-2 rounded-full border border-[#f97316]/50 backdrop-blur-md">
+                  🔥 NO BET PENALTY! 🔥
+               </div>
+            </div>
+         </div>
+      )}
+
       {/* SKILL NOTIFICATION OVERLAY */}
+      {incomingSkillEffect && (
+         <div className="absolute inset-0 z-[100] flex items-center justify-center pointer-events-none">
+            <div className="flex flex-col items-center animate-in fade-in zoom-in slide-in-from-bottom-10 duration-500">
+               {incomingSkillEffect.signal_type === 'skill_success' ? (
+                 // Success - You stole bananas
+                 <>
+                   <div className="text-6xl font-black text-[#10b981] drop-shadow-[0_0_15px_rgba(16,185,129,0.5)] mb-2">
+                     +🍌{incomingSkillEffect.amount?.toLocaleString()}
+                   </div>
+                   <div className="text-2xl font-bold text-white uppercase tracking-widest bg-[#10b981]/20 px-6 py-2 rounded-full border border-[#10b981]/50 backdrop-blur-md">
+                     💰 HEIST SUCCESS! 💰
+                   </div>
+                 </>
+               ) : (
+                 // Victim - Someone stole from you
+                 <>
+                   <div className="text-6xl font-black text-[#ef4444] drop-shadow-[0_0_15px_rgba(239,68,68,0.5)] mb-2">
+                     -🍌{incomingSkillEffect.amount?.toLocaleString()}
+                   </div>
+                   <div className="text-2xl font-bold text-white uppercase tracking-widest bg-[#ef4444]/20 px-6 py-2 rounded-full border border-[#ef4444]/50 backdrop-blur-md">
+                     🚨 YOU'VE BEEN ROBBED! 🚨
+                   </div>
+                 </>
+               )}
+            </div>
+         </div>
+      )}
       
       {/* PROFESSIONAL HEADER */}
       <header className="h-14 border-b border-[#1e293b] bg-[#0f172a] flex items-center px-4 justify-between sticky top-0 z-50">
@@ -920,60 +983,6 @@ export default function TradingInterface() {
           </ScrollArea>
         </DialogContent>
       </Dialog>
-
-      {/* Skill Effect Overlay */}
-      {incomingSkillEffect && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-          <div 
-            className={`bg-[#0f172a] border-2 ${
-              incomingSkillEffect.signal_type === 'skill_success' 
-                ? 'border-[#10b981]' 
-                : 'border-[#ef4444]'
-            } rounded-xl p-8 shadow-2xl animate-pulse pointer-events-auto`}
-            style={{
-              animation: 'skillEffect 0.5s ease-in-out'
-            }}
-          >
-            <div className="text-center">
-              {incomingSkillEffect.signal_type === 'skill_success' ? (
-                // Success message for attacker
-                <>
-                  <div className="text-6xl mb-4">💰✨</div>
-                  <h2 className="text-2xl font-bold text-[#10b981] mb-2">Skill Success!</h2>
-                  <p className="text-lg text-white mb-1">
-                    You stole <span className="text-[#f59e0b] font-bold">🍌{incomingSkillEffect.amount}</span> bananas!
-                  </p>
-                  <p className="text-sm text-[#94a3b8]">
-                    The heist was successful
-                  </p>
-                </>
-              ) : (
-                // Victim message
-                <>
-                  <div className="text-6xl mb-4">💰</div>
-                  <h2 className="text-2xl font-bold text-[#ef4444] mb-2">You've Been Robbed!</h2>
-                  <p className="text-lg text-white mb-1">
-                    Someone stole <span className="text-[#f59e0b] font-bold">🍌{incomingSkillEffect.amount}</span> from you!
-                  </p>
-                  <p className="text-sm text-[#94a3b8]">
-                    Your bananas have been taken by a skilled trader
-                  </p>
-                </>
-              )}
-              <Button
-                onClick={clearIncomingSkillEffect}
-                className={`mt-4 ${
-                  incomingSkillEffect.signal_type === 'skill_success'
-                    ? 'bg-[#10b981] hover:bg-[#059669]'
-                    : 'bg-[#ef4444] hover:bg-[#dc2626]'
-                } text-white`}
-              >
-                Close
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

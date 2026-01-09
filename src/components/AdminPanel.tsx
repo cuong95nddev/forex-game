@@ -1087,9 +1087,15 @@ export default function AdminPanel() {
           .from('users')
           .select('id, balance, name')
 
+        // Get ALL bets for this round (not just pending, since they were already updated above)
+        const { data: allBetsForRound } = await supabase
+          .from('bets')
+          .select('user_id')
+          .eq('round_id', round.id)
+
         if (allUsers) {
           // Get user IDs who placed bets in this round
-          const userIdsWithBets = bets?.map(bet => bet.user_id) || []
+          const userIdsWithBets = allBetsForRound?.map(bet => bet.user_id) || []
 
           // Find users who didn't bet
           const usersWithoutBets = allUsers.filter(
@@ -1108,6 +1114,17 @@ export default function AdminPanel() {
 
           if (usersWithoutBets.length > 0) {
             toast.info(`💸 Penalized ${usersWithoutBets.length} users ($${noBetPenalty} each) for not betting`)
+            
+            // Broadcast penalty notification to all users
+            await broadcastChannel.current?.send({
+              type: 'broadcast',
+              event: 'no-bet-penalty',
+              payload: {
+                penalizedUserIds: usersWithoutBets.map(u => u.id),
+                penaltyAmount: noBetPenalty,
+                roundNumber: round.round_number
+              }
+            })
           }
         }
       }

@@ -41,6 +41,7 @@ interface AppState {
   loading: boolean
   allUsers: User[]
   lastWinAmount: number | null
+  lastPenaltyAmount: number | null
   isWaitingForNewGame: boolean
   isAdminOnline: boolean
   isGameCompleted: boolean
@@ -52,6 +53,7 @@ interface AppState {
   setLastWinAmount: (amount: number | null) => void
   lastLossAmount: number | null
   setLastLossAmount: (amount: number | null) => void
+  setLastPenaltyAmount: (amount: number | null) => void
   initializeUser: (name: string) => Promise<void>
   loadUser: () => Promise<void>
   placeBet: (prediction: 'up' | 'down', amount: number) => Promise<boolean>
@@ -100,6 +102,7 @@ export const useStore = create<AppState>((set, get) => ({
   allUsers: [],
   lastWinAmount: null,
   lastLossAmount: null,
+  lastPenaltyAmount: null,
   loading: false, // Changed default to false
   isWaitingForNewGame: false,
   isAdminOnline: false,
@@ -112,6 +115,7 @@ export const useStore = create<AppState>((set, get) => ({
 
   setLastWinAmount: (amount) => set({ lastWinAmount: amount }),
   setLastLossAmount: (amount) => set({ lastLossAmount: amount }),
+  setLastPenaltyAmount: (amount) => set({ lastPenaltyAmount: amount }),
   clearIncomingSkillEffect: () => set({ incomingSkillEffect: null }),
 
   loadUser: async () => {
@@ -480,6 +484,28 @@ export const useStore = create<AppState>((set, get) => ({
               updatedHistory.shift()
             }
             set({ priceHistory: updatedHistory })
+          }
+        }
+      })
+      .on('broadcast', { event: 'no-bet-penalty' }, async (payload: any) => {
+        // User was penalized for not betting
+        const { penalizedUserIds, penaltyAmount } = payload.payload
+        const currentUser = get().user
+        
+        if (currentUser && penalizedUserIds.includes(currentUser.id)) {
+          // Show penalty overlay
+          set({ lastPenaltyAmount: penaltyAmount })
+          
+          // Update balance directly without full reload to avoid loading screen flash
+          const fingerprint = await getFingerprint()
+          const { data: userData } = await supabase
+            .from('users')
+            .select('*')
+            .eq('fingerprint', fingerprint)
+            .single()
+          
+          if (userData) {
+            set({ user: userData })
           }
         }
       })
