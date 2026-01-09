@@ -359,10 +359,45 @@ export default function AdminPanel() {
         .update({ balance: newGameConfig.defaultUserBalance })
         .neq('id', '00000000-0000-0000-0000-000000000000')
       
-      // Reset all user skills quantity to 3
+      // Ensure all users have all available skills (in case new skills were added)
+      const { data: allSkills } = await supabase
+        .from('skill_definitions')
+        .select('id')
+      
+      if (allSkills) {
+        const { data: allUsers } = await supabase
+          .from('users')
+          .select('id')
+        
+        if (allUsers) {
+          // Insert missing skills for all users
+          const skillInserts = []
+          for (const user of allUsers) {
+            for (const skill of allSkills) {
+              skillInserts.push({
+                user_id: user.id,
+                skill_id: skill.id,
+                quantity: 3
+              })
+            }
+          }
+          
+          // Use upsert to insert missing skills and update existing ones
+          if (skillInserts.length > 0) {
+            await supabase
+              .from('user_skills')
+              .upsert(skillInserts, {
+                onConflict: 'user_id,skill_id',
+                ignoreDuplicates: false
+              })
+          }
+        }
+      }
+      
+      // Clear frozen users
       await supabase
-        .from('user_skills')
-        .update({ quantity: 3 })
+        .from('frozen_users')
+        .delete()
         .neq('id', '00000000-0000-0000-0000-000000000000')
       
       // Update settings with new config
@@ -826,6 +861,116 @@ export default function AdminPanel() {
           .eq('id', signal.id)
 
         console.log(`Skill executed: ${fromUser.name} stole 🍌${stealAmount} from ${targetUser.name}`)
+      } else if (skill_id === 'freezer') {
+        // Get both users
+        const { data: fromUser } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', from_user_id)
+          .single()
+
+        const { data: targetUser } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', target_user_id)
+          .single()
+
+        if (!fromUser || !targetUser) {
+          console.error('User not found')
+          return
+        }
+
+        // Freeze target for next round
+        const freezeUntilRound = round_number + 1
+
+        // Delete any existing freeze record for this user first
+        await supabase
+          .from('frozen_users')
+          .delete()
+          .eq('user_id', target_user_id)
+
+        // Insert new freeze record
+        await supabase
+          .from('frozen_users')
+          .insert({
+            user_id: target_user_id,
+            frozen_until_round: freezeUntilRound,
+            frozen_by_user_id: from_user_id
+          })
+
+        // Update user skill (decrease quantity)
+        const { data: userSkill, error: skillError } = await supabase
+          .from('user_skills')
+          .select('*')
+          .eq('user_id', from_user_id)
+          .eq('skill_id', skill_id)
+          .single()
+
+        if (skillError) {
+          console.error('Error fetching user skill:', skillError)
+        }
+
+        if (userSkill) {
+          console.log('Current skill quantity:', userSkill.quantity)
+          // Decrease quantity (consumable skill)
+          const { error: updateError } = await supabase
+            .from('user_skills')
+            .update({
+              quantity: Math.max(0, userSkill.quantity - 1)
+            })
+            .eq('id', userSkill.id)
+          
+          if (updateError) {
+            console.error('Error updating skill quantity:', updateError)
+          } else {
+            console.log('Skill quantity updated to:', Math.max(0, userSkill.quantity - 1))
+          }
+        }
+
+        // Log skill usage
+        await supabase
+          .from('skill_usage_log')
+          .insert({
+            user_id: from_user_id,
+            target_user_id: target_user_id,
+            skill_id: skill_id,
+            round_number: round_number,
+            amount: 0
+          })
+
+        // Send executed signal to target user (victim)
+        await supabase
+          .from('skill_signals')
+          .insert({
+            signal_type: 'skill_executed',
+            from_user_id: from_user_id,
+            target_user_id: target_user_id,
+            skill_id: skill_id,
+            amount: 0,
+            round_number: round_number,
+            processed: true
+          })
+
+        // Send success signal to attacker (person who used the skill)
+        await supabase
+          .from('skill_signals')
+          .insert({
+            signal_type: 'skill_success',
+            from_user_id: from_user_id,
+            target_user_id: from_user_id, // Send to self
+            skill_id: skill_id,
+            amount: 0,
+            round_number: round_number,
+            processed: true
+          })
+
+        // Mark original signal as processed
+        await supabase
+          .from('skill_signals')
+          .update({ processed: true })
+          .eq('id', signal.id)
+
+        console.log(`Skill executed: ${fromUser.name} froze ${targetUser.name} until round ${freezeUntilRound}`)
       }
     } catch (error) {
       console.error('Failed to process skill request:', error)
@@ -1128,6 +1273,12 @@ export default function AdminPanel() {
           }
         }
       }
+
+      // Clear frozen users whose freeze duration has expired
+      await supabase
+        .from('frozen_users')
+        .delete()
+        .lte('frozen_until_round', round.round_number)
 
       // Check if we've reached max round
       if (maxRound && round.round_number >= maxRound) {

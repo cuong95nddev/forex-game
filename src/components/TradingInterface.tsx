@@ -48,7 +48,11 @@ export default function TradingInterface() {
     activateSkill,
     subscribeToSkillSignals,
     incomingSkillEffect,
-    clearIncomingSkillEffect
+    clearIncomingSkillEffect,
+    isFrozen,
+    frozenUntilRound,
+    checkFrozenStatus,
+    subscribeToFrozenStatus
   } = useStore()
   
   const [betAmount, setBetAmount] = useState('100')
@@ -101,6 +105,8 @@ export default function TradingInterface() {
     loadUserSkills()
     loadSkillDefinitions()
     subscribeToSkillSignals()
+    subscribeToFrozenStatus()
+    checkFrozenStatus()
     
     // Refresh online users every 5 seconds
     const interval = setInterval(() => {
@@ -108,12 +114,13 @@ export default function TradingInterface() {
       loadAllUsers()
       loadActiveBets()
       loadUserSkills()
+      checkFrozenStatus()
     }, 5000)
     
     return () => {
       clearInterval(interval)
     }
-  }, [loadRecentBets, loadActiveBets, loadPriceHistory, loadOnlineUsers, loadAllUsers, loadUserSkills, loadSkillDefinitions, subscribeToSkillSignals])
+  }, [loadRecentBets, loadActiveBets, loadPriceHistory, loadOnlineUsers, loadAllUsers, loadUserSkills, loadSkillDefinitions, subscribeToSkillSignals, subscribeToFrozenStatus, checkFrozenStatus])
 
   useEffect(() => {
     // Convert price history to chart format
@@ -190,6 +197,11 @@ export default function TradingInterface() {
   }, [incomingSkillEffect, clearIncomingSkillEffect])
 
   const handleBet = async (prediction: 'up' | 'down') => {
+    if (isFrozen) {
+      toast.error(`🧊 You are frozen until round ${frozenUntilRound}!`)
+      return
+    }
+    
     const amount = parseFloat(betAmount)
     if (isNaN(amount) || amount <= 0) {
       toast.error('Invalid amount!')
@@ -469,7 +481,32 @@ export default function TradingInterface() {
       {incomingSkillEffect && (
          <div className="absolute inset-0 z-[100] flex items-center justify-center pointer-events-none">
             <div className="flex flex-col items-center overlay-animate">
-               {incomingSkillEffect.signal_type === 'skill_success' ? (
+               {incomingSkillEffect.skill_id === 'freezer' ? (
+                 // Freezer skill
+                 <>
+                   {incomingSkillEffect.signal_type === 'skill_success' ? (
+                     // You froze someone
+                     <>
+                       <div className="text-6xl font-black text-[#3b82f6] drop-shadow-[0_0_15px_rgba(59,130,246,0.5)] mb-2 overlay-glow">
+                         🧊
+                       </div>
+                       <div className="text-2xl font-bold text-white uppercase tracking-widest bg-[#3b82f6]/20 px-6 py-2 rounded-full border border-[#3b82f6]/50 backdrop-blur-md overlay-pulse">
+                         ❄️ FREEZE SUCCESS! ❄️
+                       </div>
+                     </>
+                   ) : (
+                     // You got frozen
+                     <>
+                       <div className="text-6xl font-black text-[#3b82f6] drop-shadow-[0_0_15px_rgba(59,130,246,0.5)] mb-2 overlay-glow overlay-shake">
+                         🧊🧊🧊
+                       </div>
+                       <div className="text-2xl font-bold text-white uppercase tracking-widest bg-[#3b82f6]/20 px-6 py-2 rounded-full border border-[#3b82f6]/50 backdrop-blur-md overlay-pulse">
+                         ❄️ YOU'VE BEEN FROZEN! ❄️
+                       </div>
+                     </>
+                   )}
+                 </>
+               ) : incomingSkillEffect.signal_type === 'skill_success' ? (
                  // Success - You stole bananas
                  <>
                    <div className="text-6xl font-black text-[#10b981] drop-shadow-[0_0_15px_rgba(16,185,129,0.5)] mb-2 overlay-glow">
@@ -874,7 +911,7 @@ export default function TradingInterface() {
               <div className="space-y-3">
                  <Button
                     onClick={() => handleBet('up')}
-                    disabled={!!userBet || !currentRound || countdown < 3}
+                    disabled={!!userBet || !currentRound || countdown < 3 || isFrozen}
                     className="w-full h-14 bg-[#10b981] hover:bg-[#059669] text-white font-bold text-lg rounded-md shadow-[0_4px_0_0_#065f46] active:shadow-none active:translate-y-[4px] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                  >
                     <div className="flex items-center gap-2">
@@ -885,7 +922,7 @@ export default function TradingInterface() {
 
                  <Button
                     onClick={() => handleBet('down')}
-                    disabled={!!userBet || !currentRound || countdown < 3}
+                    disabled={!!userBet || !currentRound || countdown < 3 || isFrozen}
                     className="w-full h-14 bg-[#ef4444] hover:bg-[#b91c1c] text-white font-bold text-lg rounded-md shadow-[0_4px_0_0_#991b1b] active:shadow-none active:translate-y-[4px] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                  >
                     <div className="flex items-center gap-2">
@@ -897,7 +934,14 @@ export default function TradingInterface() {
               
               {/* Status Message */}
                <div className="mt-6 text-center">
-                  {userBet ? (
+                  {isFrozen ? (
+                     <div className="bg-[#3b82f6]/10 border border-[#3b82f6] rounded-lg p-4 animate-in fade-in zoom-in duration-300">
+                        <div className="text-[10px] text-[#3b82f6] uppercase font-bold mb-1">🧊 FROZEN</div>
+                        <div className="text-xs text-white font-medium">
+                           You cannot bet until round {frozenUntilRound}
+                        </div>
+                     </div>
+                  ) : userBet ? (
                      <div className="bg-[#1e293b] border border-[#334155] rounded-lg p-4 animate-in fade-in zoom-in duration-300">
                         <div className="text-[10px] text-[#94a3b8] uppercase font-bold mb-1">Current Banana Bet</div>
                         <div className="flex items-center justify-center gap-2 text-sm font-bold text-white">

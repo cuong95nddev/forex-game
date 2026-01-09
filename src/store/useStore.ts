@@ -50,6 +50,8 @@ interface AppState {
   userSkills: UserSkill[]
   skillDefinitions: SkillDefinition[]
   incomingSkillEffect: SkillSignal | null
+  isFrozen: boolean
+  frozenUntilRound: number | null
   setLastWinAmount: (amount: number | null) => void
   lastLossAmount: number | null
   setLastLossAmount: (amount: number | null) => void
@@ -63,6 +65,7 @@ interface AppState {
   subscribeToUsers: () => void
   subscribeToAdminPresence: () => void
   subscribeToSkillSignals: () => void
+  subscribeToFrozenStatus: () => void
   updateUserPresence: () => Promise<void>
   loadRecentBets: () => Promise<void>
   loadActiveBets: () => Promise<void>
@@ -73,6 +76,7 @@ interface AppState {
   loadSkillDefinitions: () => Promise<void>
   activateSkill: (skillId: string, targetUserId?: string) => Promise<boolean>
   clearIncomingSkillEffect: () => void
+  checkFrozenStatus: () => Promise<void>
 }
 
 let broadcastChannel: any = null
@@ -112,6 +116,8 @@ export const useStore = create<AppState>((set, get) => ({
   userSkills: [],
   skillDefinitions: [],
   incomingSkillEffect: null,
+  isFrozen: false,
+  frozenUntilRound: null,
 
   setLastWinAmount: (amount) => set({ lastWinAmount: amount }),
   setLastLossAmount: (amount) => set({ lastLossAmount: amount }),
@@ -1172,5 +1178,58 @@ export const useStore = create<AppState>((set, get) => ({
       .subscribe()
   },
 
+  checkFrozenStatus: async () => {
+    const { user, currentRound } = get()
+    if (!user || !currentRound) return
 
+    try {
+      const { data: frozenRecord } = await supabase
+        .from('frozen_users')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (frozenRecord && frozenRecord.frozen_until_round > currentRound.round_number) {
+        set({ isFrozen: true, frozenUntilRound: frozenRecord.frozen_until_round })
+      } else {
+        set({ isFrozen: false, frozenUntilRound: null })
+      }
+    } catch (error) {
+      console.error('Failed to check frozen status:', error)
+    }
+  },
+
+  subscribeToFrozenStatus: () => {
+    const { user } = get()
+    if (!user) return
+
+    supabase
+      .channel('frozen-status')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'frozen_users',
+          filter: `user_id=eq.${user.id}`
+        },
+        async (payload) => {
+          // Recheck frozen status whenever the table changes
+          await get().checkFrozenStatus()
+          
+          // If INSERT, show notification
+          if (payload.eventType === 'INSERT') {
+            const frozenData = payload.new as any
+            toast.error(`🧊 You've been frozen until round ${frozenData.frozen_until_round}!`, {
+              duration: 5000
+            })
+          } else if (payload.eventType === 'DELETE') {
+            toast.success('❄️ You are no longer frozen!', {
+              duration: 3000
+            })
+          }
+        }
+      )
+      .subscribe()
+  }
 }))
