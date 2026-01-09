@@ -1227,6 +1227,12 @@ export default function AdminPanel() {
 
     const newRoundNumber = (lastRound?.round_number || 0) + 1
 
+    // Check if we've reached max round limit before starting new round
+    if (maxRound && newRoundNumber > maxRound) {
+      console.log('❌ Cannot start new round: max round limit reached', { newRoundNumber, maxRound })
+      return
+    }
+
     console.log(`🔄 Starting new round ${newRoundNumber}`)
 
     // Get all online users (active in last 5 seconds)
