@@ -709,22 +709,18 @@ export default function TradingInterface() {
                 ) : (
                   userSkills.map((skill) => {
                     const skillDef = skill.skill_definitions
-                    const isOnCooldown = skill.last_used_round !== null && currentRound && 
-                      (currentRound.round_number - skill.last_used_round < (skillDef?.cooldown_rounds || 0))
-                    const cooldownRemaining = isOnCooldown && skillDef && currentRound
-                      ? skillDef.cooldown_rounds - (currentRound.round_number - skill.last_used_round!)
-                      : 0
+                    const hasQuantity = skill.quantity > 0
 
                     return (
                       <div
                         key={skill.id}
                         className={`p-3 rounded-lg border ${
-                          isOnCooldown
+                          !hasQuantity
                             ? 'bg-[#1e293b]/30 border-[#334155] opacity-50'
                             : 'bg-[#1e293b]/50 border-[#334155] hover:border-[#f59e0b] cursor-pointer'
                         } transition-all`}
                         onClick={() => {
-                          if (!isOnCooldown && skillDef) {
+                          if (hasQuantity && skillDef) {
                             if (skillDef.id === 'steal_money') {
                               setSelectedSkillId(skillDef.id)
                               setShowTargetDialog(true)
@@ -739,8 +735,8 @@ export default function TradingInterface() {
                             <span className="text-2xl">{skillDef?.icon || '⚡'}</span>
                             <div>
                               <h3 className="text-xs font-bold text-white">{skillDef?.name || 'Unknown'}</h3>
-                              {isOnCooldown && (
-                                <p className="text-[9px] text-[#ef4444]">Cooldown: {cooldownRemaining} rounds</p>
+                              {!hasQuantity && (
+                                <p className="text-[9px] text-[#ef4444]">No uses left</p>
                               )}
                             </div>
                           </div>

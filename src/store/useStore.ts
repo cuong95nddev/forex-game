@@ -906,7 +906,7 @@ export const useStore = create<AppState>((set, get) => ({
           .from('presence')
           .select('*')
           .eq('session_type', 'admin')
-          .gte('last_seen', new Date(Date.now() - 1000).toISOString()) // Active in last 3 seconds
+          .gte('last_seen', new Date(Date.now() - 15000).toISOString()) // Active in last 15 seconds (admin updates every 10s)
           .limit(1)
           .single()
 
@@ -938,8 +938,8 @@ export const useStore = create<AppState>((set, get) => ({
       )
       .subscribe()
 
-    // Poll every 500ms for immediate detection
-    const presenceCheckInterval = setInterval(checkAdminPresence, 500)
+    // Poll every 3 seconds for admin detection (admin updates every 10s, check more frequently)
+    const presenceCheckInterval = setInterval(checkAdminPresence, 3000)
 
     // Clean up on unmount
     return () => {
@@ -1038,20 +1038,11 @@ export const useStore = create<AppState>((set, get) => ({
       const { user, currentRound, userSkills } = get()
       if (!user || !currentRound) return false
 
-      // Check if user has this skill
+      // Check if user has this skill with quantity available
       const userSkill = userSkills.find(s => s.skill_id === skillId)
       if (!userSkill || userSkill.quantity <= 0) {
         toast.error('You don\'t have this skill!')
         return false
-      }
-
-      // Check cooldown
-      if (userSkill.last_used_round !== null) {
-        const skillDef = userSkill.skill_definitions
-        if (skillDef && currentRound.round_number - userSkill.last_used_round < skillDef.cooldown_rounds) {
-          toast.error(`Skill is on cooldown! Wait ${skillDef.cooldown_rounds - (currentRound.round_number - userSkill.last_used_round)} more rounds.`)
-          return false
-        }
       }
 
       // Create skill signal for admin to process
@@ -1104,8 +1095,19 @@ export const useStore = create<AppState>((set, get) => ({
             // Show effect to target user
             set({ incomingSkillEffect: signal })
             
-            // Reload user balance
-            await get().loadUser()
+            // Update user balance directly without full reload (to avoid "Connecting..." flash)
+            const currentUser = get().user
+            if (currentUser) {
+              const { data: updatedUser } = await supabase
+                .from('users')
+                .select('balance')
+                .eq('id', currentUser.id)
+                .single()
+              
+              if (updatedUser) {
+                set({ user: { ...currentUser, balance: updatedUser.balance } })
+              }
+            }
             
             // Auto-clear after 5 seconds
             setTimeout(() => {

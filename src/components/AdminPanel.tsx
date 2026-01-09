@@ -77,6 +77,9 @@ export default function AdminPanel() {
   const presenceHeartbeatInterval = useRef<any>(null)
   const betsSubscription = useRef<any>(null)
   const usersSubscription = useRef<any>(null)
+  const skillSignalsSubscription = useRef<any>(null)
+  const isReloadingBets = useRef(false)
+  const isReloadingUsers = useRef(false)
 
   useEffect(() => {
     // Prevent double initialization (React StrictMode)
@@ -120,6 +123,9 @@ export default function AdminPanel() {
       if (usersSubscription.current) {
         usersSubscription.current.unsubscribe()
       }
+      if (skillSignalsSubscription.current) {
+        skillSignalsSubscription.current.unsubscribe()
+      }
       // Clean up presence on unmount
       cleanupAdminPresence()
       if (broadcastChannel.current) broadcastChannel.current.unsubscribe()
@@ -127,11 +133,11 @@ export default function AdminPanel() {
     }
   }, []) // Empty dependency array - only run once on mount
   
-  // Separate effect for stats polling (bets and users update via real-time subscriptions)
+  // Separate effect for stats polling - reduced frequency since real-time subscriptions handle most updates
   useEffect(() => {
     const statsInterval = setInterval(() => {
       loadStats()
-    }, 5000)
+    }, 10000) // Changed from 5000 to 10000 (10 seconds)
     
     return () => clearInterval(statsInterval)
   }, [])
@@ -353,6 +359,12 @@ export default function AdminPanel() {
         .update({ balance: newGameConfig.defaultUserBalance })
         .neq('id', '00000000-0000-0000-0000-000000000000')
       
+      // Reset all user skills quantity to 3
+      await supabase
+        .from('user_skills')
+        .update({ quantity: 3 })
+        .neq('id', '00000000-0000-0000-0000-000000000000')
+      
       // Update settings with new config
       if (settingsId) {
         await supabase
@@ -524,19 +536,36 @@ export default function AdminPanel() {
   }
 
   const loadCurrentRound = async () => {
-    const { data } = await supabase
-      .from('rounds')
-      .select('*')
-      .eq('status', 'active')
-      .order('round_number', { ascending: false })
-      .limit(1)
-      .single()
+    try {
+      const { data, error } = await supabase
+        .from('rounds')
+        .select('*')
+        .eq('status', 'active')
+        .order('round_number', { ascending: false })
+        .limit(1)
+        .single()
 
-    if (data) {
-      setCurrentRound(data)
-      setIsGameRunning(true) // Resume game running state if there's an active round
-      // Load bets after confirming there's a round
-      await loadCurrentBets()
+      if (error) {
+        // No active round found (not an error, just no data)
+        if (error.code === 'PGRST116') {
+          setCurrentRound(null)
+          setIsGameRunning(false)
+          console.log('No active round found')
+          return
+        }
+        console.error('Error loading current round:', error)
+        return
+      }
+
+      if (data) {
+        console.log('Active round loaded:', data)
+        setCurrentRound(data)
+        setIsGameRunning(true) // Resume game running state if there's an active round
+        // Load bets after confirming there's a round
+        await loadCurrentBets()
+      }
+    } catch (error) {
+      console.error('Failed to load current round:', error)
     }
   }
 
@@ -553,7 +582,7 @@ export default function AdminPanel() {
           onConflict: 'session_id'
         })
 
-      // Start heartbeat to update presence every 1 second
+      // Start heartbeat to update presence every 10 seconds (reduced from 1 second)
       presenceHeartbeatInterval.current = setInterval(async () => {
         try {
           await supabase
@@ -565,7 +594,7 @@ export default function AdminPanel() {
         } catch (error) {
           console.error('Failed to update admin presence:', error)
         }
-      }, 1000)
+      }, 10000)
 
       console.log('Admin presence initialized')
     } catch (error) {
@@ -589,9 +618,26 @@ export default function AdminPanel() {
   const setupRealtimeSubscriptions = () => {
     console.log('Setting up real-time subscriptions for admin...')
     
+    // Clean up existing subscriptions first
+    if (betsSubscription.current) {
+      betsSubscription.current.unsubscribe()
+      betsSubscription.current = null
+    }
+    if (usersSubscription.current) {
+      usersSubscription.current.unsubscribe()
+      usersSubscription.current = null
+    }
+    if (skillSignalsSubscription.current) {
+      skillSignalsSubscription.current.unsubscribe()
+      skillSignalsSubscription.current = null
+    }
+    
+    // Create unique channel names to avoid conflicts
+    const channelSuffix = Date.now()
+    
     // Subscribe to bet changes
     betsSubscription.current = supabase
-      .channel('admin-bets-changes')
+      .channel(`admin-bets-${channelSuffix}`)
       .on(
         'postgres_changes',
         {
@@ -601,7 +647,14 @@ export default function AdminPanel() {
         },
         (payload) => {
           console.log('Bet change detected:', payload)
-          loadCurrentBets()
+          // Debounce: only reload if not already reloading
+          if (!isReloadingBets.current) {
+            isReloadingBets.current = true
+            setTimeout(() => {
+              loadCurrentBets()
+              isReloadingBets.current = false
+            }, 500)
+          }
         }
       )
       .subscribe((status) => {
@@ -610,7 +663,7 @@ export default function AdminPanel() {
 
     // Subscribe to user changes (balance updates)
     usersSubscription.current = supabase
-      .channel('admin-users-changes')
+      .channel(`admin-users-${channelSuffix}`)
       .on(
         'postgres_changes',
         {
@@ -620,7 +673,14 @@ export default function AdminPanel() {
         },
         (payload) => {
           console.log('User change detected:', payload)
-          loadUsers()
+          // Debounce: only reload if not already reloading
+          if (!isReloadingUsers.current) {
+            isReloadingUsers.current = true
+            setTimeout(() => {
+              loadUsers()
+              isReloadingUsers.current = false
+            }, 500)
+          }
         }
       )
       .subscribe((status) => {
@@ -628,8 +688,8 @@ export default function AdminPanel() {
       })
 
     // Subscribe to skill signals
-    supabase
-      .channel('admin-skill-signals')
+    skillSignalsSubscription.current = supabase
+      .channel(`admin-skills-${channelSuffix}`)
       .on(
         'postgres_changes',
         {
@@ -693,22 +753,33 @@ export default function AdminPanel() {
           .update({ balance: Math.max(0, targetUser.balance - stealAmount) })
           .eq('id', target_user_id)
 
-        // Update user skill (decrease quantity and set last_used_round)
-        const { data: userSkill } = await supabase
+        // Update user skill (decrease quantity)
+        const { data: userSkill, error: skillError } = await supabase
           .from('user_skills')
           .select('*')
           .eq('user_id', from_user_id)
           .eq('skill_id', skill_id)
           .single()
 
+        if (skillError) {
+          console.error('Error fetching user skill:', skillError)
+        }
+
         if (userSkill) {
-          await supabase
+          console.log('Current skill quantity:', userSkill.quantity)
+          // Decrease quantity (consumable skill)
+          const { error: updateError } = await supabase
             .from('user_skills')
             .update({
-              quantity: Math.max(0, userSkill.quantity - 1),
-              last_used_round: round_number
+              quantity: Math.max(0, userSkill.quantity - 1)
             })
             .eq('id', userSkill.id)
+          
+          if (updateError) {
+            console.error('Error updating skill quantity:', updateError)
+          } else {
+            console.log('Skill quantity updated to:', Math.max(0, userSkill.quantity - 1))
+          }
         }
 
         // Log skill usage
