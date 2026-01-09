@@ -13,7 +13,7 @@ function App() {
     <BrowserRouter>
       <MultiTabDetector />
       <BlockingLoader isLoading={loading} />
-      <Toaster />
+      <Toaster position="top-right" />
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/admin" element={<AdminPage />} />
