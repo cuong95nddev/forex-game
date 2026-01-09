@@ -426,11 +426,11 @@ export default function TradingInterface() {
       {/* WIN ANIMATION OVERLAY */}
       {lastWinAmount !== null && (
          <div className="absolute inset-0 z-[100] flex items-center justify-center pointer-events-none">
-            <div className="flex flex-col items-center animate-in fade-in zoom-in slide-in-from-bottom-10 duration-500">
-               <div className="text-6xl font-black text-[#10b981] drop-shadow-[0_0_15px_rgba(16,185,129,0.5)] mb-2">
+            <div className="flex flex-col items-center overlay-animate">
+               <div className="text-6xl font-black text-[#10b981] drop-shadow-[0_0_15px_rgba(16,185,129,0.5)] mb-2 overlay-glow">
                   +🍌{lastWinAmount.toLocaleString()}
                </div>
-               <div className="text-2xl font-bold text-white uppercase tracking-widest bg-[#10b981]/20 px-6 py-2 rounded-full border border-[#10b981]/50 backdrop-blur-md">
+               <div className="text-2xl font-bold text-white uppercase tracking-widest bg-[#10b981]/20 px-6 py-2 rounded-full border border-[#10b981]/50 backdrop-blur-md overlay-pulse">
                   🎉 BANANA WIN! 🎉
                </div>
             </div>
@@ -440,11 +440,11 @@ export default function TradingInterface() {
       {/* LOSS ANIMATION OVERLAY */}
       {lastLossAmount !== null && (
          <div className="absolute inset-0 z-[100] flex items-center justify-center pointer-events-none">
-            <div className="flex flex-col items-center animate-in fade-in zoom-in slide-in-from-bottom-10 duration-500">
-               <div className="text-6xl font-black text-[#ef4444] drop-shadow-[0_0_15px_rgba(239,68,68,0.5)] mb-2">
+            <div className="flex flex-col items-center overlay-animate overlay-shake">
+               <div className="text-6xl font-black text-[#ef4444] drop-shadow-[0_0_15px_rgba(239,68,68,0.5)] mb-2 overlay-glow">
                   -🍌{lastLossAmount.toLocaleString()}
                </div>
-               <div className="text-2xl font-bold text-white uppercase tracking-widest bg-[#ef4444]/20 px-6 py-2 rounded-full border border-[#ef4444]/50 backdrop-blur-md">
+               <div className="text-2xl font-bold text-white uppercase tracking-widest bg-[#ef4444]/20 px-6 py-2 rounded-full border border-[#ef4444]/50 backdrop-blur-md overlay-pulse">
                   😢 BANANAS SLIPPED! 😢
                </div>
             </div>
@@ -454,11 +454,11 @@ export default function TradingInterface() {
       {/* PENALTY ANIMATION OVERLAY */}
       {lastPenaltyAmount !== null && (
          <div className="absolute inset-0 z-[100] flex items-center justify-center pointer-events-none">
-            <div className="flex flex-col items-center animate-in fade-in zoom-in slide-in-from-bottom-10 duration-500">
-               <div className="text-6xl font-black text-[#f97316] drop-shadow-[0_0_15px_rgba(249,115,22,0.5)] mb-2">
+            <div className="flex flex-col items-center overlay-animate overlay-shake">
+               <div className="text-6xl font-black text-[#f97316] drop-shadow-[0_0_15px_rgba(249,115,22,0.5)] mb-2 overlay-glow">
                   🔥-🍌{lastPenaltyAmount.toLocaleString()}
                </div>
-               <div className="text-2xl font-bold text-white uppercase tracking-widest bg-[#f97316]/20 px-6 py-2 rounded-full border border-[#f97316]/50 backdrop-blur-md">
+               <div className="text-2xl font-bold text-white uppercase tracking-widest bg-[#f97316]/20 px-6 py-2 rounded-full border border-[#f97316]/50 backdrop-blur-md overlay-pulse">
                   🔥 NO BET PENALTY! 🔥
                </div>
             </div>
@@ -468,24 +468,24 @@ export default function TradingInterface() {
       {/* SKILL NOTIFICATION OVERLAY */}
       {incomingSkillEffect && (
          <div className="absolute inset-0 z-[100] flex items-center justify-center pointer-events-none">
-            <div className="flex flex-col items-center animate-in fade-in zoom-in slide-in-from-bottom-10 duration-500">
+            <div className="flex flex-col items-center overlay-animate">
                {incomingSkillEffect.signal_type === 'skill_success' ? (
                  // Success - You stole bananas
                  <>
-                   <div className="text-6xl font-black text-[#10b981] drop-shadow-[0_0_15px_rgba(16,185,129,0.5)] mb-2">
+                   <div className="text-6xl font-black text-[#10b981] drop-shadow-[0_0_15px_rgba(16,185,129,0.5)] mb-2 overlay-glow">
                      +🍌{incomingSkillEffect.amount?.toLocaleString()}
                    </div>
-                   <div className="text-2xl font-bold text-white uppercase tracking-widest bg-[#10b981]/20 px-6 py-2 rounded-full border border-[#10b981]/50 backdrop-blur-md">
+                   <div className="text-2xl font-bold text-white uppercase tracking-widest bg-[#10b981]/20 px-6 py-2 rounded-full border border-[#10b981]/50 backdrop-blur-md overlay-pulse">
                      💰 HEIST SUCCESS! 💰
                    </div>
                  </>
                ) : (
                  // Victim - Someone stole from you
                  <>
-                   <div className="text-6xl font-black text-[#ef4444] drop-shadow-[0_0_15px_rgba(239,68,68,0.5)] mb-2">
+                   <div className="text-6xl font-black text-[#ef4444] drop-shadow-[0_0_15px_rgba(239,68,68,0.5)] mb-2 overlay-glow overlay-shake">
                      -🍌{incomingSkillEffect.amount?.toLocaleString()}
                    </div>
-                   <div className="text-2xl font-bold text-white uppercase tracking-widest bg-[#ef4444]/20 px-6 py-2 rounded-full border border-[#ef4444]/50 backdrop-blur-md">
+                   <div className="text-2xl font-bold text-white uppercase tracking-widest bg-[#ef4444]/20 px-6 py-2 rounded-full border border-[#ef4444]/50 backdrop-blur-md overlay-pulse">
                      🚨 YOU'VE BEEN ROBBED! 🚨
                    </div>
                  </>

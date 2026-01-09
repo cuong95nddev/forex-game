@@ -97,16 +97,66 @@
   }
 }
 
-@keyframes skillEffect {
+@keyframes overlayBounceIn {
   0% {
-    transform: scale(0.5) rotate(-10deg);
+    transform: scale(0.3) translateY(100px);
     opacity: 0;
   }
   50% {
-    transform: scale(1.1) rotate(5deg);
-  }
-  100% {
-    transform: scale(1) rotate(0deg);
+    transform: scale(1.05) translateY(-20px);
     opacity: 1;
   }
+  70% {
+    transform: scale(0.95) translateY(10px);
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes overlayPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+@keyframes overlayShake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-10px);
+  }
+  75% {
+    transform: translateX(10px);
+  }
+}
+
+@keyframes overlayGlow {
+  0%, 100% {
+    filter: drop-shadow(0 0 10px currentColor);
+  }
+  50% {
+    filter: drop-shadow(0 0 25px currentColor);
+  }
+}
+
+.overlay-animate {
+  animation: overlayBounceIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.overlay-pulse {
+  animation: overlayPulse 2s ease-in-out infinite;
+}
+
+.overlay-shake {
+  animation: overlayShake 0.5s ease-in-out;
+}
+
+.overlay-glow {
+  animation: overlayGlow 1.5s ease-in-out infinite;
 }
