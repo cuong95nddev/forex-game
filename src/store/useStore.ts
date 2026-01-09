@@ -746,6 +746,8 @@ export const useStore = create<AppState>((set, get) => ({
           })
           // Reload all users to reflect allowed_users from new round
           get().loadAllUsers()
+          // Check frozen status immediately when new round starts
+          get().checkFrozenStatus()
         }
       )
       .on(
@@ -1189,7 +1191,7 @@ export const useStore = create<AppState>((set, get) => ({
         .eq('user_id', user.id)
         .maybeSingle()
 
-      if (frozenRecord && frozenRecord.frozen_until_round > currentRound.round_number) {
+      if (frozenRecord && frozenRecord.frozen_until_round >= currentRound.round_number) {
         set({ isFrozen: true, frozenUntilRound: frozenRecord.frozen_until_round })
       } else {
         set({ isFrozen: false, frozenUntilRound: null })
@@ -1220,7 +1222,7 @@ export const useStore = create<AppState>((set, get) => ({
           // If INSERT, show notification
           if (payload.eventType === 'INSERT') {
             const frozenData = payload.new as any
-            toast.error(`🧊 You've been frozen until round ${frozenData.frozen_until_round}!`, {
+            toast.error(`🧊 You've been frozen until end of round ${frozenData.frozen_until_round}!`, {
               duration: 5000
             })
           } else if (payload.eventType === 'DELETE') {

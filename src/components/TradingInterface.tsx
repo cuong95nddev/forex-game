@@ -188,17 +188,22 @@ export default function TradingInterface() {
 
   useEffect(() => {
     if (incomingSkillEffect !== null) {
+       // If freezer skill, immediately check frozen status
+       if (incomingSkillEffect.skill_id === 'freezer') {
+          checkFrozenStatus()
+       }
+       
        // Clear the skill effect after 4 seconds to hide the animation
        const timer = setTimeout(() => {
           clearIncomingSkillEffect()
        }, 4000)
        return () => clearTimeout(timer)
     }
-  }, [incomingSkillEffect, clearIncomingSkillEffect])
+  }, [incomingSkillEffect, clearIncomingSkillEffect, checkFrozenStatus])
 
   const handleBet = async (prediction: 'up' | 'down') => {
     if (isFrozen) {
-      toast.error(`🧊 You are frozen until round ${frozenUntilRound}!`)
+      toast.error(`🧊 You are frozen until end of round ${frozenUntilRound}!`)
       return
     }
     
@@ -821,7 +826,7 @@ export default function TradingInterface() {
                         } transition-all`}
                         onClick={() => {
                           if (hasQuantity && skillDef) {
-                            if (skillDef.id === 'steal_money') {
+                            if (skillDef.id === 'steal_money' || skillDef.id === 'freezer') {
                               setSelectedSkillId(skillDef.id)
                               setShowTargetDialog(true)
                             } else {
@@ -938,7 +943,7 @@ export default function TradingInterface() {
                      <div className="bg-[#3b82f6]/10 border border-[#3b82f6] rounded-lg p-4 animate-in fade-in zoom-in duration-300">
                         <div className="text-[10px] text-[#3b82f6] uppercase font-bold mb-1">🧊 FROZEN</div>
                         <div className="text-xs text-white font-medium">
-                           You cannot bet until round {frozenUntilRound}
+                           You cannot bet until end of round {frozenUntilRound}
                         </div>
                      </div>
                   ) : userBet ? (
@@ -983,7 +988,11 @@ export default function TradingInterface() {
               Select Target
             </DialogTitle>
             <DialogDescription className="text-[#94a3b8]">
-              Choose a trader to steal bananas from
+              {selectedSkillId === 'steal_money' 
+                ? 'Choose a trader to steal bananas from'
+                : selectedSkillId === 'freezer'
+                ? 'Choose a trader to freeze'
+                : 'Choose a target for your skill'}
             </DialogDescription>
           </DialogHeader>
           

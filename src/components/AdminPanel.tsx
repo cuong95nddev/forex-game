@@ -880,8 +880,8 @@ export default function AdminPanel() {
           return
         }
 
-        // Freeze target for next round
-        const freezeUntilRound = round_number + 1
+        // Freeze target immediately (for current round, unfrozen when next round starts)
+        const freezeUntilRound = round_number
 
         // Delete any existing freeze record for this user first
         await supabase
@@ -1274,12 +1274,6 @@ export default function AdminPanel() {
         }
       }
 
-      // Clear frozen users whose freeze duration has expired
-      await supabase
-        .from('frozen_users')
-        .delete()
-        .lte('frozen_until_round', round.round_number)
-
       // Check if we've reached max round
       if (maxRound && round.round_number >= maxRound) {
         // Game completed! Show leaderboard
@@ -1385,6 +1379,13 @@ export default function AdminPanel() {
     }
 
     console.log(`🔄 Starting new round ${newRoundNumber}`)
+
+    // Clear frozen users whose freeze duration has expired
+    // Users frozen until round N should be unfrozen when round N starts
+    await supabase
+      .from('frozen_users')
+      .delete()
+      .lt('frozen_until_round', newRoundNumber)
 
     // Get all online users (active in last 5 seconds)
     const { data: presenceData } = await supabase
