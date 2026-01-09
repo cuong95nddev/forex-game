@@ -980,7 +980,49 @@ export default function TradingInterface() {
               </div>
 
               {/* Action Buttons */}
-              <div className="space-y-3">
+              <div className="space-y-3 relative">
+                 {/* Countdown Overlay - shows when betting is locked (final 3 seconds) */}
+                 {countdown < 3 && countdown > 0 && !userBet && !isFrozen && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+                       <div className="flex flex-col items-center overlay-animate">
+                          <div className="text-8xl font-black text-[#f59e0b] drop-shadow-[0_0_25px_rgba(245,158,11,0.8)] overlay-glow animate-pulse">
+                             {countdown}
+                          </div>
+                          <div className="text-lg font-bold text-white uppercase tracking-widest bg-[#f59e0b]/20 px-4 py-1 rounded-full border border-[#f59e0b]/50 backdrop-blur-md overlay-pulse mt-2">
+                             ⚠️ LOCKED ⚠️
+                          </div>
+                       </div>
+                    </div>
+                 )}
+                 
+                 {/* Waiting Overlay - shows when user has already bet */}
+                 {userBet && countdown > 0 && !isFrozen && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+                       <div className="flex flex-col items-center overlay-animate">
+                          <div className="text-8xl font-black text-[#3b82f6] drop-shadow-[0_0_25px_rgba(59,130,246,0.8)] overlay-glow animate-pulse">
+                             {countdown}
+                          </div>
+                          <div className="text-lg font-bold text-white uppercase tracking-widest bg-[#3b82f6]/20 px-4 py-1 rounded-full border border-[#3b82f6]/50 backdrop-blur-md overlay-pulse mt-2">
+                             ⏳ WAITING ⏳
+                          </div>
+                       </div>
+                    </div>
+                 )}
+                 
+                 {/* Frozen Overlay - shows when user is frozen */}
+                 {isFrozen && countdown > 0 && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+                       <div className="flex flex-col items-center overlay-animate">
+                          <div className="text-8xl font-black text-[#3b82f6] drop-shadow-[0_0_25px_rgba(59,130,246,0.8)] overlay-glow animate-pulse">
+                             {countdown}
+                          </div>
+                          <div className="text-lg font-bold text-white uppercase tracking-widest bg-[#3b82f6]/20 px-4 py-1 rounded-full border border-[#3b82f6]/50 backdrop-blur-md overlay-pulse mt-2">
+                             🧊 FROZEN 🧊
+                          </div>
+                       </div>
+                    </div>
+                 )}
+                 
                  <Button
                     onClick={() => handleBet('up')}
                     disabled={!!userBet || !currentRound || countdown < 3 || isFrozen}
@@ -1025,10 +1067,6 @@ export default function TradingInterface() {
                            <span>🍌 {userBet.bet_amount}</span>
                         </div>
                      </div>
-                  ) : countdown < 3 && countdown > 0 ? (
-                    <div className="text-xs text-[#f59e0b] font-bold bg-[#f59e0b]/10 p-2 rounded border border-[#f59e0b]/30">
-                       ⚠ Locked
-                    </div>
                   ) : null}
                </div>
 
