@@ -1202,6 +1202,19 @@ export const useStore = create<AppState>((set, get) => ({
               get().clearIncomingSkillEffect()
             }, 5000)
           }
+          
+          if (signal.signal_type === 'skill_reward') {
+            // Show skill reward notification
+            set({ incomingSkillEffect: signal })
+            
+            // Reload skills to update quantity
+            await get().loadUserSkills()
+            
+            // Auto-clear after 5 seconds
+            setTimeout(() => {
+              get().clearIncomingSkillEffect()
+            }, 5000)
+          }
         }
       )
       .subscribe()

@@ -503,6 +503,16 @@ export default function TradingInterface() {
                      This round's winnings will be DOUBLED!
                    </div>
                  </>
+               ) : incomingSkillEffect.skill_id === 'bank_loan' && incomingSkillEffect.signal_type === 'skill_success' ? (
+                 // Bank loan received
+                 <>
+                   <div className="text-6xl font-black text-[#10b981] drop-shadow-[0_0_15px_rgba(16,185,129,0.5)] mb-2 overlay-glow">
+                     +🍌{incomingSkillEffect.amount?.toLocaleString()}
+                   </div>
+                   <div className="text-2xl font-bold text-white uppercase tracking-widest bg-[#10b981]/20 px-6 py-2 rounded-full border border-[#10b981]/50 backdrop-blur-md overlay-pulse">
+                     🏦 BANK LOAN RECEIVED! 🏦
+                   </div>
+                 </>
                ) : incomingSkillEffect.skill_id === 'double_win' && incomingSkillEffect.signal_type === 'skill_effect' ? (
                  // Double win triggered
                  <>
@@ -511,6 +521,19 @@ export default function TradingInterface() {
                    </div>
                    <div className="text-2xl font-bold text-white uppercase tracking-widest bg-[#a855f7]/20 px-6 py-2 rounded-full border border-[#a855f7]/50 backdrop-blur-md overlay-pulse">
                      🎲 DOUBLE WIN! 🎲
+                   </div>
+                 </>
+               ) : incomingSkillEffect.signal_type === 'skill_reward' ? (
+                 // Skill reward for winning
+                 <>
+                   <div className="text-6xl font-black text-[#f59e0b] drop-shadow-[0_0_15px_rgba(245,158,11,0.5)] mb-2 overlay-glow">
+                     🎁
+                   </div>
+                   <div className="text-2xl font-bold text-white uppercase tracking-widest bg-[#f59e0b]/20 px-6 py-2 rounded-full border border-[#f59e0b]/50 backdrop-blur-md overlay-pulse">
+                     🎁 BONUS SKILL! 🎁
+                   </div>
+                   <div className="text-sm text-[#f59e0b] mt-2">
+                     You received +1 {incomingSkillEffect.skill_id.replace('_', ' ').toUpperCase()}!
                    </div>
                  </>
                ) : incomingSkillEffect.skill_id === 'freezer' ? (

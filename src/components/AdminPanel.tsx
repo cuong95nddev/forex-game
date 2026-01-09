@@ -377,7 +377,7 @@ export default function AdminPanel() {
               skillInserts.push({
                 user_id: user.id,
                 skill_id: skill.id,
-                quantity: 3
+                quantity: 1
               })
             }
           }
@@ -1081,6 +1081,88 @@ export default function AdminPanel() {
           .eq('id', signal.id)
 
         console.log(`Skill executed: ${fromUser.name} activated double win for round ${round_number}`)
+      } else if (skill_id === 'bank_loan') {
+        // Get user
+        const { data: fromUser } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', from_user_id)
+          .single()
+
+        if (!fromUser) {
+          console.error('User not found')
+          return
+        }
+
+        // Give user 500 bananas from bank loan
+        const loanAmount = 500
+        const newBalance = fromUser.balance + loanAmount
+
+        await supabase
+          .from('users')
+          .update({ balance: newBalance })
+          .eq('id', from_user_id)
+
+        // Update user skill (decrease quantity)
+        const { data: userSkill, error: skillError } = await supabase
+          .from('user_skills')
+          .select('*')
+          .eq('user_id', from_user_id)
+          .eq('skill_id', skill_id)
+          .single()
+
+        if (skillError) {
+          console.error('Error fetching user skill:', skillError)
+        }
+
+        if (userSkill) {
+          console.log('Current skill quantity:', userSkill.quantity)
+          // Decrease quantity (consumable skill)
+          const { error: updateError } = await supabase
+            .from('user_skills')
+            .update({
+              quantity: Math.max(0, userSkill.quantity - 1)
+            })
+            .eq('id', userSkill.id)
+          
+          if (updateError) {
+            console.error('Error updating skill quantity:', updateError)
+          } else {
+            console.log('Skill quantity updated to:', Math.max(0, userSkill.quantity - 1))
+          }
+        }
+
+        // Log skill usage
+        await supabase
+          .from('skill_usage_log')
+          .insert({
+            user_id: from_user_id,
+            target_user_id: null,
+            skill_id: skill_id,
+            round_number: round_number,
+            amount: loanAmount
+          })
+
+        // Send success signal to user
+        await supabase
+          .from('skill_signals')
+          .insert({
+            signal_type: 'skill_success',
+            from_user_id: from_user_id,
+            target_user_id: from_user_id, // Send to self
+            skill_id: skill_id,
+            amount: loanAmount,
+            round_number: round_number,
+            processed: true
+          })
+
+        // Mark original signal as processed
+        await supabase
+          .from('skill_signals')
+          .update({ processed: true })
+          .eq('id', signal.id)
+
+        console.log(`Skill executed: ${fromUser.name} received bank loan of 🍌${loanAmount}`)
       }
     } catch (error) {
       console.error('Failed to process skill request:', error)
@@ -1368,6 +1450,40 @@ export default function AdminPanel() {
               .from('users')
               .update({ balance: newBalance })
               .eq('id', bet.user_id)
+
+            // Reward winner with a random skill
+            // Get all skills for this user
+            const { data: userSkills } = await supabase
+              .from('user_skills')
+              .select('*')
+              .eq('user_id', bet.user_id)
+
+            if (userSkills && userSkills.length > 0) {
+              // Randomly select a skill
+              const randomSkill = userSkills[Math.floor(Math.random() * userSkills.length)]
+              
+              // Increase quantity by 1
+              const newQuantity = randomSkill.quantity + 1
+              await supabase
+                .from('user_skills')
+                .update({ quantity: newQuantity })
+                .eq('id', randomSkill.id)
+
+              console.log(`🎁 Skill reward: ${bet.users.name} won and received +1 ${randomSkill.skill_id}`)
+
+              // Send skill reward notification
+              await supabase
+                .from('skill_signals')
+                .insert({
+                  signal_type: 'skill_reward',
+                  from_user_id: bet.user_id,
+                  target_user_id: bet.user_id,
+                  skill_id: randomSkill.skill_id,
+                  amount: 1,
+                  round_number: round.round_number,
+                  processed: true
+                })
+            }
           }
         }
       }
