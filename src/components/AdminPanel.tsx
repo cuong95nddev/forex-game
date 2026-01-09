@@ -1373,9 +1373,7 @@ export default function AdminPanel() {
   const completeRound = async (round: any) => {
     try {
       console.log('⏰ Completing round:', { 
-        roundNumber: round.round_number, 
-        maxRound: maxRound,
-        willEndGame: maxRound && round.round_number >= maxRound 
+        roundNumber: round.round_number
       })
       
       // Get latest price
@@ -1559,11 +1557,24 @@ export default function AdminPanel() {
         }
       }
 
+      // Fetch the latest max_round from database (so changes take effect immediately)
+      const { data: latestSettings } = await supabase
+        .from('game_settings')
+        .select('max_round')
+        .single()
+      
+      const currentMaxRound = latestSettings?.max_round || null
+      
+      // Update local state if it changed
+      if (currentMaxRound !== maxRound) {
+        setMaxRound(currentMaxRound)
+      }
+
       // Check if we've reached max round
-      if (maxRound && round.round_number >= maxRound) {
+      if (currentMaxRound && round.round_number >= currentMaxRound) {
         // Game completed! Show leaderboard
-        console.log('🏁 Max round reached! Ending game...', { maxRound, currentRound: round.round_number })
-        toast.info(`🏁 Max round ${maxRound} reached! Calculating final results...`)
+        console.log('🏁 Max round reached! Ending game...', { maxRound: currentMaxRound, currentRound: round.round_number })
+        toast.info(`🏁 Max round ${currentMaxRound} reached! Calculating final results...`)
         await endGame()
       } else {
         // Start new round
