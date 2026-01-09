@@ -925,23 +925,48 @@ export default function TradingInterface() {
       {incomingSkillEffect && (
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
           <div 
-            className="bg-[#0f172a] border-2 border-[#ef4444] rounded-xl p-8 shadow-2xl animate-pulse pointer-events-auto"
+            className={`bg-[#0f172a] border-2 ${
+              incomingSkillEffect.signal_type === 'skill_success' 
+                ? 'border-[#10b981]' 
+                : 'border-[#ef4444]'
+            } rounded-xl p-8 shadow-2xl animate-pulse pointer-events-auto`}
             style={{
               animation: 'skillEffect 0.5s ease-in-out'
             }}
           >
             <div className="text-center">
-              <div className="text-6xl mb-4">💰</div>
-              <h2 className="text-2xl font-bold text-[#ef4444] mb-2">You've Been Robbed!</h2>
-              <p className="text-lg text-white mb-1">
-                Someone stole <span className="text-[#f59e0b] font-bold">🍌{incomingSkillEffect.amount}</span> from you!
-              </p>
-              <p className="text-sm text-[#94a3b8]">
-                Your bananas have been taken by a skilled trader
-              </p>
+              {incomingSkillEffect.signal_type === 'skill_success' ? (
+                // Success message for attacker
+                <>
+                  <div className="text-6xl mb-4">💰✨</div>
+                  <h2 className="text-2xl font-bold text-[#10b981] mb-2">Skill Success!</h2>
+                  <p className="text-lg text-white mb-1">
+                    You stole <span className="text-[#f59e0b] font-bold">🍌{incomingSkillEffect.amount}</span> bananas!
+                  </p>
+                  <p className="text-sm text-[#94a3b8]">
+                    The heist was successful
+                  </p>
+                </>
+              ) : (
+                // Victim message
+                <>
+                  <div className="text-6xl mb-4">💰</div>
+                  <h2 className="text-2xl font-bold text-[#ef4444] mb-2">You've Been Robbed!</h2>
+                  <p className="text-lg text-white mb-1">
+                    Someone stole <span className="text-[#f59e0b] font-bold">🍌{incomingSkillEffect.amount}</span> from you!
+                  </p>
+                  <p className="text-sm text-[#94a3b8]">
+                    Your bananas have been taken by a skilled trader
+                  </p>
+                </>
+              )}
               <Button
                 onClick={clearIncomingSkillEffect}
-                className="mt-4 bg-[#ef4444] hover:bg-[#dc2626] text-white"
+                className={`mt-4 ${
+                  incomingSkillEffect.signal_type === 'skill_success'
+                    ? 'bg-[#10b981] hover:bg-[#059669]'
+                    : 'bg-[#ef4444] hover:bg-[#dc2626]'
+                } text-white`}
               >
                 Close
               </Button>

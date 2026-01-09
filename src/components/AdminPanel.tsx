@@ -793,13 +793,26 @@ export default function AdminPanel() {
             amount: stealAmount
           })
 
-        // Send executed signal to target user
+        // Send executed signal to target user (victim)
         await supabase
           .from('skill_signals')
           .insert({
             signal_type: 'skill_executed',
             from_user_id: from_user_id,
             target_user_id: target_user_id,
+            skill_id: skill_id,
+            amount: stealAmount,
+            round_number: round_number,
+            processed: true
+          })
+
+        // Send success signal to attacker (person who used the skill)
+        await supabase
+          .from('skill_signals')
+          .insert({
+            signal_type: 'skill_success',
+            from_user_id: from_user_id,
+            target_user_id: from_user_id, // Send to self
             skill_id: skill_id,
             amount: stealAmount,
             round_number: round_number,

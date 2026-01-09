@@ -1092,7 +1092,7 @@ export const useStore = create<AppState>((set, get) => ({
           const signal = payload.new as SkillSignal
           
           if (signal.signal_type === 'skill_executed') {
-            // Show effect to target user
+            // Show effect to target user (victim)
             set({ incomingSkillEffect: signal })
             
             // Update user balance directly without full reload (to avoid "Connecting..." flash)
@@ -1108,6 +1108,33 @@ export const useStore = create<AppState>((set, get) => ({
                 set({ user: { ...currentUser, balance: updatedUser.balance } })
               }
             }
+            
+            // Auto-clear after 5 seconds
+            setTimeout(() => {
+              get().clearIncomingSkillEffect()
+            }, 5000)
+          }
+          
+          if (signal.signal_type === 'skill_success') {
+            // Show success to attacker (person who used the skill)
+            set({ incomingSkillEffect: signal })
+            
+            // Update user balance
+            const currentUser = get().user
+            if (currentUser) {
+              const { data: updatedUser } = await supabase
+                .from('users')
+                .select('balance')
+                .eq('id', currentUser.id)
+                .single()
+              
+              if (updatedUser) {
+                set({ user: { ...currentUser, balance: updatedUser.balance } })
+              }
+            }
+            
+            // Reload skills to update quantity
+            await get().loadUserSkills()
             
             // Auto-clear after 5 seconds
             setTimeout(() => {
