@@ -1,4 +1,6 @@
-# Forex Game — Agent Instructions
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Build & Dev Commands
 
@@ -9,6 +11,8 @@ npm run lint       # ESLint
 npm run preview    # Preview production build locally
 ```
 
+No test framework is configured. There are no tests.
+
 ### Database Migrations
 
 ```bash
@@ -17,13 +21,31 @@ npx supabase db push   # Apply migrations to remote Supabase project
 
 Always create a new SQL file under `supabase/migrations/` with an incrementing timestamp prefix (e.g. `20260109000013_description.sql`). Never edit existing migration files.
 
+### Supabase CLI
+
+Supabase CLI is installed via Homebrew (`supabase/tap/supabase`). The project is linked to the remote `forex` project (ref: `mgkozkabfvlghaxntgob`, region: Singapore).
+
+```bash
+supabase migration list   # Check local vs remote migration status
+supabase db push          # Push migrations to remote
+supabase db pull          # Pull remote schema changes
+supabase db diff          # Diff local vs remote schema
+supabase inspect db       # Inspect remote database
+```
+
+**Note:** `supabase login` requires a TTY — it cannot run from Claude Code's Bash tool. The user must run it in their terminal.
+
+### Environment Variables
+
+Copy `.env.example` to `.env` and set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+
 ---
 
 ## Architecture
 
 ```
 src/
-  pages/           # Route-level components
+  pages/           # Route-level components (HomePage, AdminPage)
   components/      # Feature components + ui/ (Radix-based primitives)
   store/           # Zustand global state (useStore.ts)
   lib/             # supabase.ts (client + TS interfaces), fingerprint.ts, utils.ts
@@ -31,7 +53,11 @@ supabase/
   migrations/      # SQL migrations applied via Supabase CLI
 ```
 
+**Path alias:** `@` maps to `src/` (configured in `vite.config.ts`).
+
 **Data flow:** Supabase realtime broadcasts → Zustand store → React components.
+
+**Routing:** Two routes — `/` (HomePage, player-facing) and an obfuscated base64 path for the admin page (see `App.tsx`). The admin route is intentionally obscured.
 
 **Key principle:** The `AdminPage` / `AdminPanel` is the "backend" — it contains the core game logic (price updates, round management, skill resolution). Player-facing pages only react to state.
 
@@ -45,10 +71,12 @@ supabase/
 | State | Zustand 5 |
 | Backend | Supabase 2 (Postgres + Realtime + RLS) |
 | UI primitives | Radix UI + Tailwind CSS 4 |
-| Charts | Lightweight Charts 5 (TradingView-style) |
+| Routing | React Router DOM 7 |
+| Charts | Lightweight Charts 5 (TradingView-style) + Recharts 3 |
 | Icons | Lucide React |
 | Toasts | Sonner |
 | Fingerprinting | FingerprintJS 5 |
+| Effects | canvas-confetti (win celebrations) |
 
 ---
 
