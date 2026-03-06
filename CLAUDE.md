@@ -13,6 +13,20 @@ npm run preview    # Preview production build locally
 
 No test framework is configured. There are no tests.
 
+### Node.js Version
+
+**Always prefix Node.js/npm commands with `source ~/.nvm/nvm.sh && nvm use 20 &&`** — the project requires Node 20 via nvm.
+
+### Backend Server
+
+```bash
+cd server && npm run dev    # Start Express backend (tsx watch, port 3001)
+cd server && npm run build  # Compile TypeScript to dist/
+cd server && npm start      # Run compiled server
+```
+
+Server requires `server/.env` with `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_API_KEY`.
+
 ### Database Migrations
 
 ```bash
@@ -37,7 +51,7 @@ supabase inspect db       # Inspect remote database
 
 ### Environment Variables
 
-Copy `.env.example` to `.env` and set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+Copy `.env.example` to `.env` and set `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_API_URL`, and `VITE_ADMIN_API_KEY`.
 
 ---
 
@@ -48,7 +62,13 @@ src/
   pages/           # Route-level components (HomePage, AdminPage)
   components/      # Feature components + ui/ (Radix-based primitives)
   store/           # Zustand global state (useStore.ts)
-  lib/             # supabase.ts (client + TS interfaces), fingerprint.ts, utils.ts
+  lib/             # supabase.ts (client + TS interfaces), adminApi.ts (backend API client), fingerprint.ts, utils.ts
+server/
+  src/
+    engine/        # Game loop, price simulator, round manager, skill processor
+    routes/        # Express REST API (game, settings, users, data)
+    services/      # Supabase broadcast, DB helpers
+    middleware/     # Admin API key auth
 supabase/
   migrations/      # SQL migrations applied via Supabase CLI
 ```
@@ -59,7 +79,7 @@ supabase/
 
 **Routing:** Two routes — `/` (HomePage, player-facing) and an obfuscated base64 path for the admin page (see `App.tsx`). The admin route is intentionally obscured.
 
-**Key principle:** The `AdminPage` / `AdminPanel` is the "backend" — it contains the core game logic (price updates, round management, skill resolution). Player-facing pages only react to state.
+**Key principle:** The Node.js `server/` is the backend — it owns all game logic (price simulation, round management, skill resolution, broadcasting). `AdminPanel` is a thin UI that calls the REST API. Player-facing pages react to Supabase Realtime broadcasts from the server.
 
 ---
 
@@ -76,6 +96,7 @@ supabase/
 | Icons | Lucide React |
 | Toasts | Sonner |
 | Fingerprinting | FingerprintJS 5 |
+| Game Server | Node.js + Express 5 + TypeScript (in `server/`) |
 | Effects | canvas-confetti (win celebrations) |
 
 ---

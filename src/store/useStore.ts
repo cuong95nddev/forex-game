@@ -43,7 +43,7 @@ interface AppState {
   lastWinAmount: number | null
   lastPenaltyAmount: number | null
   isWaitingForNewGame: boolean
-  isAdminOnline: boolean
+
   isGameCompleted: boolean
   leaderboard: User[]
   maxRound: number | null
@@ -64,7 +64,7 @@ interface AppState {
   subscribeToBroadcast: () => void
   subscribeToRounds: () => void
   subscribeToUsers: () => void
-  subscribeToAdminPresence: () => void
+
   subscribeToSkillSignals: () => void
   subscribeToFrozenStatus: () => void
   updateUserPresence: () => Promise<void>
@@ -86,7 +86,7 @@ let goldPriceChannel: any = null
 let roundsChannel: any = null
 let betsChannel: any = null
 let usersChannel: any = null
-let presenceChannel: any = null
+
 let skillSignalsChannel: any = null
 let subscriptionsActive = false
 let acceptedAdminSession: string | null = null // Only accept broadcasts from one admin
@@ -111,7 +111,6 @@ export const useStore = create<AppState>((set, get) => ({
   lastPenaltyAmount: null,
   loading: false, // Changed default to false
   isWaitingForNewGame: false,
-  isAdminOnline: false,
   isGameCompleted: false,
   leaderboard: [],
   maxRound: null,
@@ -929,64 +928,6 @@ export const useStore = create<AppState>((set, get) => ({
       })
   },
 
-  subscribeToAdminPresence: () => {
-    // Clean up existing channel if it exists
-    if (presenceChannel) {
-      presenceChannel.unsubscribe()
-      presenceChannel = null
-    }
-
-    // Check for admin presence
-    const checkAdminPresence = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('presence')
-          .select('*')
-          .eq('session_type', 'admin')
-          .gte('last_seen', new Date(Date.now() - 15000).toISOString()) // Active in last 15 seconds (admin updates every 10s)
-          .limit(1)
-          .single()
-
-        const adminOnline = !error && data !== null
-        set({ isAdminOnline: adminOnline })
-      } catch (error) {
-        set({ isAdminOnline: false })
-      }
-    }
-
-    // Initial check
-    checkAdminPresence()
-
-    // Subscribe to presence changes - focus on admin session type
-    presenceChannel = supabase
-      .channel('presence-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'presence',
-          filter: 'session_type=eq.admin'
-        },
-        () => {
-          // Immediately check admin presence when any change occurs
-          checkAdminPresence()
-        }
-      )
-      .subscribe()
-
-    // Poll every 3 seconds for admin detection (admin updates every 10s, check more frequently)
-    const presenceCheckInterval = setInterval(checkAdminPresence, 3000)
-
-    // Clean up on unmount
-    return () => {
-      clearInterval(presenceCheckInterval)
-      if (presenceChannel) {
-        presenceChannel.unsubscribe()
-        presenceChannel = null
-      }
-    }
-  },
 
   updateUserPresence: async () => {
     const { user } = get()
